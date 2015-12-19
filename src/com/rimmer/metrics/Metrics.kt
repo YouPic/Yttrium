@@ -136,8 +136,8 @@ class Metrics: MetricsWriter {
 
             val average = totalTime / count
             val median = calls[count / 2]
-            val p95 = calls[Math.ceil(count.toDouble() * 0.95).toInt()]
-            val p99 = calls[Math.ceil(count.toDouble() * 0.99).toInt()]
+            val p95 = calls[Math.ceil((count - 1).toDouble() * 0.95).toInt()]
+            val p99 = calls[Math.ceil((count - 1).toDouble() * 0.99).toInt()]
             val min = calls[0]
             val max = calls[count - 1]
 
