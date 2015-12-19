@@ -22,7 +22,7 @@ data class Event(val event: EventType, val type: String, val startDate: DateTime
 
 interface Sender {
     fun sendStatistic(path: String, time: DateTime, stat: Statistic)
-    fun sendProfile(path: String, time: DateTime, duration: Long, events: List<Event>)
+    fun sendProfile(path: String, time: DateTime, start: Long, end: Long, events: List<Event>)
     fun sendError(path: String, time: DateTime, reason: String)
 }
 
@@ -152,8 +152,8 @@ class Metrics: MetricsWriter {
             ))
 
             // Send a full profile for the median and maximum values.
-            sendProfile(median.path, median.startDate, median.endTime - median.startTime, median.events)
-            sendProfile(max.path, max.startDate, max.endTime - max.startTime, max.events)
+            sendProfile(median.path, median.startDate, median.startTime, median.endTime, median.events)
+            sendProfile(max.path, max.startDate, max.startTime, max.endTime, max.events)
         }
     }
 }
