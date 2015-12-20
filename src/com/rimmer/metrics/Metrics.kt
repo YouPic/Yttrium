@@ -71,6 +71,7 @@ class Metrics: MetricsWriter {
             if(time - path.lastSend > 60000000000L) {
                 sendStats(path)
                 path.calls.clear()
+                path.lastSend = time
             }
         }
     }
@@ -109,51 +110,61 @@ class Metrics: MetricsWriter {
     }
 
     private fun sendStats(path: Path) {
-        sender?.run {
-            // Filter out any failed requests. If it was an internal failure we log it.
-            val calls = ArrayList<Call>(path.calls.size)
-            path.calls.filterTo(calls) {
-                if(it.error) {
-                    sendError(it.path, it.startDate, it.failReason)
+        // The sender may throw exceptions, which we don't want to leak.
+        try {
+            sender?.run {
+                // Filter out any failed requests. If it was an internal failure we log it.
+                val calls = ArrayList<Call>(path.calls.size)
+                path.calls.filterTo(calls) {
+                    if (it.error) {
+                        sendError(it.path, it.startDate, it.failReason)
+                    }
+                    !it.failed
                 }
-                !it.failed
+
+                // If all calls failed, we have nothing more to do.
+                if (calls.isEmpty()) return
+
+                val date = calls[0].startDate
+                val count = calls.size
+
+                // We need to sort the calls on their duration to find the median and percentiles.
+                // In the same loop we calculate the average.
+                var totalTime = 0L
+                calls.sortBy {
+                    val elapsed = it.endTime - it.startTime
+                    totalTime += elapsed
+                    elapsed
+                }
+
+                if(calls.size == 1) {
+                    totalTime = calls[0].endTime - calls[0].startTime
+                }
+
+                val average = totalTime / count
+                val median = calls[count / 2]
+                val p95 = calls[Math.ceil((count - 1).toDouble() * 0.95).toInt()]
+                val p99 = calls[Math.ceil((count - 1).toDouble() * 0.99).toInt()]
+                val min = calls[0]
+                val max = calls[count - 1]
+
+                sendStatistic(min.path, date, Statistic(
+                    average = average,
+                    median = median.endTime - median.startTime,
+                    average95 = p95.endTime - p95.startTime,
+                    average99 = p99.endTime - p99.startTime,
+                    min = min.endTime - min.startTime,
+                    max = max.endTime - max.startTime,
+                    count = count
+                ))
+
+                // Send a full profile for the median and maximum values.
+                sendProfile(median.path, median.startDate, median.startTime, median.endTime, median.events)
+                sendProfile(max.path, max.startDate, max.startTime, max.endTime, max.events)
             }
-
-            // If all calls failed, we have nothing more to do.
-            if(calls.isEmpty()) return
-
-            val date = calls[0].startDate
-            val count = calls.size
-
-            // We need to sort the calls on their duration to find the median and percentiles.
-            // In the same loop we calculate the average.
-            var totalTime = 0L
-            calls.sortBy {
-                val elapsed = it.endTime - it.startTime
-                totalTime += elapsed
-                elapsed
-            }
-
-            val average = totalTime / count
-            val median = calls[count / 2]
-            val p95 = calls[Math.ceil((count - 1).toDouble() * 0.95).toInt()]
-            val p99 = calls[Math.ceil((count - 1).toDouble() * 0.99).toInt()]
-            val min = calls[0]
-            val max = calls[count - 1]
-
-            sendStatistic(min.path, date, Statistic(
-                average = average,
-                median = median.endTime - median.startTime,
-                average95 = p95.endTime - p95.startTime,
-                average99 = p99.endTime - p99.startTime,
-                min = min.endTime - min.startTime,
-                max = max.endTime - max.startTime,
-                count = count
-            ))
-
-            // Send a full profile for the median and maximum values.
-            sendProfile(median.path, median.startDate, median.startTime, median.endTime, median.events)
-            sendProfile(max.path, max.startDate, max.startTime, max.endTime, max.events)
+        } catch(e: Throwable) {
+            println("Could not send metrics:")
+            e.printStackTrace()
         }
     }
 }
