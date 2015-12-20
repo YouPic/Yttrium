@@ -12,27 +12,45 @@ class ElasticSender(val search: Client): Sender {
                 .field("path", path)
                 .field("time", time)
                 .field("reason", reason)
-                .endObject()
+            .endObject()
         ).execute()
     }
 
     override fun sendProfile(path: String, time: DateTime, start: Long, end: Long, events: List<Event>) {
-        search.prepareIndex("metrics", "profile").setSource(
-            XContentFactory.jsonBuilder().startObject()
-                .field("path", path)
-                .field("time", time)
-                .field("events", events)
-                .endObject()
-        ).execute()
+        val json = XContentFactory.jsonBuilder()
+        json.startObject().field("path", path).field("time", time)
+        json.startArray("events")
+        events.forEach {
+            json.startObject()
+                .field("eventType", it.event)
+                .field("eventKind", it.type)
+                .field("time", it.startDate)
+                .field("start", it.startTime)
+                .field("end", it.endTime)
+            .endObject()
+        }
+        json.endArray()
+        json.endObject()
+
+        search.prepareIndex("metrics", "profile").setSource(json).execute()
     }
 
     override fun sendStatistic(path: String, time: DateTime, stat: Statistic) {
-        search.prepareIndex("metrics", "stat").setSource(
-            XContentFactory.jsonBuilder().startObject()
-                .field("path", path)
-                .field("time", time)
-                .field("stat", stat)
-                .endObject()
-        ).execute()
+        val json = XContentFactory.jsonBuilder()
+        .startObject()
+            .field("path", path)
+            .field("time", time)
+            .startObject("stat")
+                .field("median", stat.median)
+                .field("average", stat.average)
+                .field("average95", stat.average95)
+                .field("average99", stat.average99)
+                .field("max", stat.max)
+                .field("min", stat.min)
+                .field("count", stat.count)
+            .endObject()
+        .endObject()
+
+        search.prepareIndex("metrics", "stat").setSource(json).execute()
     }
 }
