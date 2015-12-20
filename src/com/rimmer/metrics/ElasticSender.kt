@@ -54,3 +54,63 @@ class ElasticSender(val search: Client): Sender {
         search.prepareIndex("metrics", "stat").setSource(json).execute()
     }
 }
+
+/** Call this to recreate the index. This removes any existing metrics data! */
+fun createElasticIndex(search: org.elasticsearch.client.Client) {
+    if(search.admin().indices().prepareExists("metrics").get().isExists) {
+        search.admin().indices().prepareDelete("metrics").get()
+    }
+
+    val error = XContentFactory.jsonBuilder()
+    .startObject()
+        .startObject("error")
+            .startObject("properties")
+                .startObject("path").field("type", "string").field("index", "not_analyzed").endObject()
+                .startObject("time").field("type", "date").endObject()
+                .startObject("reason").field("type", "string").field("index", "not_analyzed").endObject()
+            .endObject()
+        .endObject()
+    .endObject()
+
+    val profile = XContentFactory.jsonBuilder()
+    .startObject()
+        .startObject("profile")
+            .startObject("properties")
+                .startObject("path").field("type", "string").field("index", "not_analyzed").endObject()
+                .startObject("time").field("type", "date").endObject()
+                .startObject("events")
+                    .startObject("properties")
+                        .startObject("eventType").field("type", "string").field("index", "not_analyzed").endObject()
+                        .startObject("eventKind").field("type", "string").field("index", "not_analyzed").endObject()
+                        .startObject("time").field("type", "date").endObject()
+                        .startObject("start").field("type", "long").endObject()
+                        .startObject("end").field("type", "long").endObject()
+                    .endObject()
+                .endObject()
+            .endObject()
+        .endObject()
+    .endObject()
+
+    val stat = XContentFactory.jsonBuilder()
+    .startObject()
+        .startObject("stat")
+            .startObject("properties")
+                .startObject("path").field("type", "string").field("index", "not_analyzed").endObject()
+                .startObject("time").field("type", "date").endObject()
+                .startObject("stat")
+                    .startObject("properties")
+                        .startObject("median").field("type", "long").endObject()
+                        .startObject("average").field("type", "long").endObject()
+                        .startObject("average95").field("type", "long").endObject()
+                        .startObject("average99").field("type", "long").endObject()
+                        .startObject("max").field("type", "long").endObject()
+                        .startObject("min").field("type", "long").endObject()
+                        .startObject("count").field("type", "long").endObject()
+                    .endObject()
+                .endObject()
+            .endObject()
+        .endObject()
+    .endObject()
+
+    search.admin().indices().prepareCreate("metrics").addMapping("error", error).addMapping("profile", profile).addMapping("stat", stat).get()
+}
