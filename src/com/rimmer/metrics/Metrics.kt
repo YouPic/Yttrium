@@ -1,6 +1,7 @@
 
 package com.rimmer.metrics
 
+import com.rimmer.metrics.server.Event
 import org.joda.time.DateTime
 import java.util.*
 
@@ -18,7 +19,6 @@ interface MetricsWriter {
 }
 
 data class Statistic(val average: Long, val median: Long, val average95: Long, val average99: Long, val min: Long, val max: Long, val count: Int)
-data class Event(val event: EventType, val type: String, val startDate: DateTime, val startTime: Long, val endTime: Long)
 
 interface Sender {
     fun sendStatistic(path: String, time: DateTime, stat: Statistic)
