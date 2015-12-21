@@ -1,4 +1,4 @@
-package com.rimmer.metrics.metrics
+package com.rimmer.metrics
 
 import com.rimmer.metrics.server.ErrorPacket
 import com.rimmer.metrics.server.Interval

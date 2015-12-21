@@ -1,5 +1,5 @@
 
-package com.rimmer.metrics.metrics
+package com.rimmer.metrics
 
 import com.rimmer.metrics.server.*
 import org.joda.time.DateTime

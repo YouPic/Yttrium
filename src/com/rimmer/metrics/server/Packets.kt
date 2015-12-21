@@ -1,6 +1,6 @@
 package com.rimmer.metrics.server
 
-import com.rimmer.metrics.metrics.EventType
+import com.rimmer.metrics.EventType
 import org.joda.time.DateTime
 
 val statsAggregator = "metrics.aggregator.stat"
