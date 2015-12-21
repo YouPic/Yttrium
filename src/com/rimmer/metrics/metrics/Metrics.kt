@@ -1,7 +1,7 @@
 
-package com.rimmer.metrics
+package com.rimmer.metrics.metrics
 
-import com.rimmer.metrics.server.Event
+import com.rimmer.metrics.server.*
 import org.joda.time.DateTime
 import java.util.*
 
@@ -18,21 +18,20 @@ interface MetricsWriter {
     fun endEvent(id: Int)
 }
 
-data class Statistic(val average: Long, val median: Long, val average95: Long, val average99: Long, val min: Long, val max: Long, val count: Int)
-
 interface Sender {
-    fun sendStatistic(path: String, time: DateTime, stat: Statistic)
-    fun sendProfile(path: String, time: DateTime, start: Long, end: Long, events: List<Event>)
-    fun sendError(path: String, time: DateTime, reason: String)
+    fun sendStatistic(stat: StatPacket)
+    fun sendProfile(profile: ProfilePacket)
+    fun sendError(error: ErrorPacket)
 }
 
 class Metrics: MetricsWriter {
-    inner class Call(val path: String, val startDate: DateTime, val startTime: Long) {
+    inner class Call(val path: String, val startDate: DateTime, val startTime: Long, val parameters: Map<String, String>) {
         val events = ArrayList<Event>()
         var endTime = startTime
         var failed = false
         var error = false
         var failReason = ""
+        var failTrace = ""
     }
 
     inner class Path {
@@ -45,10 +44,10 @@ class Metrics: MetricsWriter {
     private val currentCall = ThreadLocal<Call>()
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
-    fun start(path: String) {
+    fun start(path: String, parameters: Map<String, String>) {
         val startTime = System.nanoTime()
         val startDate = DateTime.now()
-        currentCall.set(Call(path, startDate, startTime))
+        currentCall.set(Call(path, startDate, startTime, parameters))
     }
 
     /** Indicates that the current action has completed. It is added to the metrics. */
@@ -117,7 +116,7 @@ class Metrics: MetricsWriter {
                 val calls = ArrayList<Call>(path.calls.size)
                 path.calls.filterTo(calls) {
                     if (it.error) {
-                        sendError(it.path, it.startDate, it.failReason)
+                        sendError(ErrorPacket(it.path, it.startDate, it.failReason, it.failTrace, it.parameters))
                     }
                     !it.failed
                 }
@@ -141,26 +140,16 @@ class Metrics: MetricsWriter {
                     totalTime = calls[0].endTime - calls[0].startTime
                 }
 
-                val average = totalTime / count
                 val median = calls[count / 2]
-                val p95 = calls[Math.ceil((count - 1).toDouble() * 0.95).toInt()]
-                val p99 = calls[Math.ceil((count - 1).toDouble() * 0.99).toInt()]
                 val min = calls[0]
                 val max = calls[count - 1]
 
-                sendStatistic(min.path, date, Statistic(
-                    average = average,
-                    median = median.endTime - median.startTime,
-                    average95 = p95.endTime - p95.startTime,
-                    average99 = p99.endTime - p99.startTime,
-                    min = min.endTime - min.startTime,
-                    max = max.endTime - max.startTime,
-                    count = count
-                ))
+                // Send the timing intervals for calculating statistics.
+                sendStatistic(StatPacket(min.path, "", date, totalTime, calls.map {Interval(it.startTime, it.endTime)}))
 
                 // Send a full profile for the median and maximum values.
-                sendProfile(median.path, median.startDate, median.startTime, median.endTime, median.events)
-                sendProfile(max.path, max.startDate, max.startTime, max.endTime, max.events)
+                sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
+                sendProfile(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
