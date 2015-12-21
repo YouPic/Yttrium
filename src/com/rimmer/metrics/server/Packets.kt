@@ -1,10 +1,11 @@
 package com.rimmer.metrics.server
 
-import com.rimmer.metrics.EventType
+import com.rimmer.metrics.metrics.EventType
 import org.joda.time.DateTime
 
 val statsAggregator = "metrics.aggregator.stat"
 val errorAggregator = "metrics.aggregator.error"
+val profileAggregator = "metrics.aggregator.profile"
 
 class Interval(val start: Long, val end: Long) {
     val length: Long get() = end - start
