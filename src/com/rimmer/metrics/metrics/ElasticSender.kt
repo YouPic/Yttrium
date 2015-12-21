@@ -1,26 +1,30 @@
-package com.rimmer.metrics
+package com.rimmer.metrics.metrics
 
+import com.rimmer.metrics.server.ErrorPacket
+import com.rimmer.metrics.server.Interval
+import com.rimmer.metrics.server.ProfilePacket
+import com.rimmer.metrics.server.StatPacket
 import org.elasticsearch.client.Client
 import org.elasticsearch.common.xcontent.XContentFactory
 import org.joda.time.DateTime
 
 /** A metrics sender implementation for ElasticSearch. */
 class ElasticSender(val search: Client): Sender {
-    override fun sendError(path: String, time: DateTime, reason: String) {
+    override fun sendError(error: ErrorPacket) {
         search.prepareIndex("metrics", "error").setSource(
             XContentFactory.jsonBuilder().startObject()
-                .field("path", path)
-                .field("time", time)
-                .field("reason", reason)
+                .field("path", error.path)
+                .field("time", error.time)
+                .field("reason", error.cause)
             .endObject()
         ).execute()
     }
 
-    override fun sendProfile(path: String, time: DateTime, start: Long, end: Long, events: List<Event>) {
+    override fun sendProfile(profile: ProfilePacket) {
         val json = XContentFactory.jsonBuilder()
-        json.startObject().field("path", path).field("time", time)
+        json.startObject().field("path", profile.path).field("time", profile.time)
         json.startArray("events")
-        events.forEach {
+        profile.events.forEach {
             json.startObject()
                 .field("eventType", it.event)
                 .field("eventKind", it.type)
@@ -35,28 +39,33 @@ class ElasticSender(val search: Client): Sender {
         search.prepareIndex("metrics", "profile").setSource(json).execute()
     }
 
-    override fun sendStatistic(path: String, time: DateTime, stat: Statistic) {
+    override fun sendStatistic(stat: StatPacket) {
         val json = XContentFactory.jsonBuilder()
         .startObject()
-            .field("path", path)
-            .field("time", time)
+            .field("path", stat.path)
+            .field("time", stat.time)
             .startObject("stat")
-                .field("median", stat.median)
-                .field("average", stat.average)
-                .field("average95", stat.average95)
-                .field("average99", stat.average99)
-                .field("max", stat.max)
-                .field("min", stat.min)
-                .field("count", stat.count)
+                .field("median", percentile(stat.intervals, 0.5))
+                .field("average", stat.totalElapsed / stat.intervals.size)
+                .field("average95", percentile(stat.intervals, 0.95))
+                .field("average99", percentile(stat.intervals, 0.99))
+                .field("max", percentile(stat.intervals, 1.0))
+                .field("min", percentile(stat.intervals, 0.0))
+                .field("count", stat.intervals.size)
             .endObject()
         .endObject()
 
         search.prepareIndex("metrics", "stat").setSource(json).execute()
     }
+
+    fun percentile(intervals: List<Interval>, percentile: Double): Long {
+        val e = intervals[Math.ceil(intervals.size * percentile).toInt()]
+        return e.end - e.start
+    }
 }
 
 /** Call this to recreate the index. This removes any existing metrics data! */
-fun createElasticIndex(search: org.elasticsearch.client.Client) {
+fun createElasticIndex(search: Client) {
     if(search.admin().indices().prepareExists("metrics").get().isExists) {
         search.admin().indices().prepareDelete("metrics").get()
     }
