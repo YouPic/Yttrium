@@ -1,7 +1,9 @@
 package com.rimmer.yttrium.serialize
 
+import com.rimmer.yttrium.InvalidStateException
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
+import java.util.*
 
 /**
  * Represents a type that can be serialized.
@@ -36,7 +38,7 @@ fun writeJson(value: Any?, target: ByteBuf) {
             is Char -> writer.value(value.toString())
             is Byte -> writer.value(value)
             is Short -> writer.value(value)
-            else -> throw IllegalArgumentException("Value $value cannot be serialized.")
+            else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
     }
 }
@@ -62,7 +64,17 @@ fun writeBinary(value: Any?, target: ByteBuf) {
             is Char -> writer.writeString(value.toString())
             is Byte -> writer.writeVarInt(value.toInt())
             is Short -> writer.writeVarInt(value.toInt())
-            else -> throw IllegalArgumentException("Value $value cannot be serialized.")
+            else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
     }
 }
+
+class Readable(val fromJson: (ByteBuf) -> Any, val fromBinary: (ByteBuf) -> Any)
+
+/** Registers a readable type. */
+fun registerReadable(type: Class<*>, fromJson: (ByteBuf) -> Any, fromBinary: (ByteBuf) -> Any) {
+    readableTypes[type] = Readable(fromJson, fromBinary)
+}
+
+/** Contains the currently registered readable types. */
+private val readableTypes = HashMap<Class<*>, Readable>()
