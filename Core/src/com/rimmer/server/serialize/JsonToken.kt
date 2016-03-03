@@ -252,7 +252,7 @@ fun parseHexit(c: Char): Int {
     return res
 }
 
-// We use a small lookup table for com.youpic.codegen.parser.parseHexit,
+// We use a small lookup table for parseHexit,
 // since the number of branches would be ridiculous otherwise.
 val parseHexitLookup = arrayOf(
     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,	/* 0..9 */
