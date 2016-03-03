@@ -20,7 +20,7 @@ interface Writable {
 /**
  * Stores a value as json.
  * The value must be either a Writable type, or any of the following builtin types:
- * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String.
+ * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String, Enum.
  */
 fun writeJson(value: Any?, target: ByteBuf) {
     if(value is Writable) {
@@ -32,6 +32,7 @@ fun writeJson(value: Any?, target: ByteBuf) {
             is Long -> writer.value(value)
             is String -> writer.value(value)
             is DateTime -> writer.value(value)
+            is Enum<*> -> writer.value(value.name)
             is Boolean -> writer.value(value)
             is Float -> writer.value(value)
             is Double -> writer.value(value)
@@ -58,6 +59,7 @@ fun writeBinary(value: Any?, target: ByteBuf) {
             is Long -> writer.writeVarLong(value)
             is String -> writer.writeString(value)
             is DateTime -> writer.writeVarLong(value.millis)
+            is Enum<*> -> writer.writeVarInt(value.ordinal)
             is Boolean -> writer.writeVarInt(if(value) 1 else 0)
             is Float -> writer.writeFloat(value)
             is Double -> writer.writeDouble(value)
@@ -84,6 +86,10 @@ fun readPrimitive(source: String, target: Class<*>): Any {
         return source
     } else if(target == DateTime::class.java) {
         return DateTime.parse(source)
+    } else if(target.isEnum) {
+        return (target as Class<Enum<*>>).enumConstants.find {
+            it.name == source
+        } ?: throw InvalidStateException("Expected instance of enum $target")
     } else if(target == Boolean::class.java) {
         if(source == "true") return true
         else if(source == "false") return false
@@ -126,8 +132,6 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
         return readable.fromJson(buffer)
     } else {
         val reader = JsonToken(buffer)
-        reader.parse()
-
         if(target == Int::class.java) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toInt()
@@ -138,6 +142,7 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
             reader.expect(JsonToken.Type.StringLit)
             return reader.stringPayload
         } else if(target == DateTime::class.java) {
+            reader.parse()
             if(reader.type == JsonToken.Type.NumberLit) {
                 return DateTime(reader.numberPayload.toLong())
             } else if(reader.type == JsonToken.Type.StringLit) {
@@ -145,6 +150,11 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
             } else {
                 throw InvalidStateException("Expected a json date.")
             }
+        } else if(target.isEnum) {
+            reader.expect(JsonToken.Type.StringLit)
+            return (target as Class<Enum<*>>).enumConstants.find {
+                it.name == reader.stringPayload
+            } ?: throw InvalidStateException("Expected instance of enum $target")
         } else if(target == Boolean::class.java) {
             reader.expect(JsonToken.Type.BoolLit)
             return reader.boolPayload
@@ -188,6 +198,13 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
             return reader.readString()
         } else if(target == DateTime::class.java) {
             return DateTime(reader.readVarLong())
+        } else if(target.isEnum) {
+            val index = reader.readVarInt()
+            val values = (target as Class<Enum<*>>).enumConstants
+            if(values.size <= index || index < 0) {
+                throw InvalidStateException("Expected instance of enum $target")
+            }
+            return values[index]
         } else if(target == Boolean::class.java) {
             return if(reader.readVarInt() == 0) false else true
         } else if(target == Float::class.java) {
