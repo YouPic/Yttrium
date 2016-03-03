@@ -49,4 +49,17 @@
             </plugin>
         </plugins>
     </build>
+
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>Yttrium-Core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>Yttrium-Router</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
 </project>
