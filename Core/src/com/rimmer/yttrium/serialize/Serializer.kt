@@ -1,6 +1,6 @@
 package com.rimmer.yttrium.serialize
 
-import com.rimmer.yttrium.InvalidStateException
+import com.rimmer.yttrium.*
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
 import java.util.*
@@ -66,6 +66,52 @@ fun writeBinary(value: Any?, target: ByteBuf) {
             is Short -> writer.writeVarInt(value.toInt())
             else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
+    }
+}
+
+/**
+ * Reads a primitive value from a string.
+ * This can be used for parsing immediate parameters such as query strings.
+ * Supported target types are:
+ * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String.
+ */
+fun readPrimitive(source: String, target: Class<*>): Any {
+    if(target == Int::class.java) {
+        return maybeParseInt(source) ?: throw InvalidStateException("Expected an integer")
+    } else if(target == Long::class.java) {
+        return maybeParseLong(source) ?: throw InvalidStateException("Expected an integer")
+    } else if(target == String::class.java) {
+        return source
+    } else if(target == DateTime::class.java) {
+        return DateTime.parse(source)
+    } else if(target == Boolean::class.java) {
+        if(source == "true") return true
+        else if(source == "false") return false
+        else throw InvalidStateException("Expected a boolean")
+    } else if(target == Float::class.java) {
+        try {
+            return java.lang.Float.parseFloat(source)
+        } catch(e: Exception) {
+            throw InvalidStateException("Expected a floating point value")
+        }
+    } else if(target == Double::class.java) {
+        try {
+            return java.lang.Double.parseDouble(source)
+        } catch(e: Exception) {
+            throw InvalidStateException("Expected a floating point value")
+        }
+    } else if(target == Char::class.java) {
+        if(source.length == 1) {
+            return source[0]
+        } else {
+            throw InvalidStateException("Expected a character")
+        }
+    } else if(target == Byte::class.java) {
+        return maybeParseInt(source)?.toByte() ?: throw InvalidStateException("Expected an integer")
+    } else if(target == Short::class.java) {
+        return maybeParseInt(source)?.toShort() ?: throw InvalidStateException("Expected an integer")
+    } else {
+        throw InvalidStateException("Target type $target is not a primitive type.")
     }
 }
 
