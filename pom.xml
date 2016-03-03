@@ -10,6 +10,7 @@
     <modules>
         <module>Router</module>
         <module>Core</module>
+        <module>Server</module>
     </modules>
 
     <repositories>
