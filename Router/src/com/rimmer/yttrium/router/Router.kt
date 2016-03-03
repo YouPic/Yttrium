@@ -1,6 +1,6 @@
-package com.rimmer.server.router
+package com.rimmer.yttrium.router
 
-import com.rimmer.server.router.plugin.Plugin
+import com.rimmer.yttrium.router.plugin.Plugin
 import java.util.*
 import java.util.regex.Pattern
 import kotlin.reflect.*

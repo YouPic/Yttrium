@@ -1,6 +1,6 @@
-package com.rimmer.server.router
+package com.rimmer.yttrium.router
 
-import com.rimmer.server.serialize.JsonWriter
+import com.rimmer.yttrium.serialize.JsonWriter
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import java.lang.reflect.Type

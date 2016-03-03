@@ -1,4 +1,4 @@
-package com.rimmer.server.serialize
+package com.rimmer.yttrium.serialize
 
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime

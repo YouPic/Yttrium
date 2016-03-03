@@ -1,4 +1,4 @@
-package com.rimmer.server.router
+package com.rimmer.yttrium.router
 
 /**
  * Defines an http GET path. The path string can contain parameters prepended by ':'.

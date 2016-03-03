@@ -1,9 +1,9 @@
-package com.rimmer.server.router
+package com.rimmer.yttrium.router
 
-import com.rimmer.server.InvalidStateException
-import com.rimmer.server.NotFoundException
-import com.rimmer.server.UnauthorizedException
-import com.rimmer.server.serialize.writeJson
+import com.rimmer.yttrium.InvalidStateException
+import com.rimmer.yttrium.NotFoundException
+import com.rimmer.yttrium.UnauthorizedException
+import com.rimmer.yttrium.serialize.writeJson
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*

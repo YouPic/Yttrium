@@ -1,6 +1,6 @@
-package com.rimmer.server.serialize
+package com.rimmer.yttrium.serialize
 
-import com.rimmer.server.InvalidStateException
+import com.rimmer.yttrium.InvalidStateException
 import io.netty.buffer.ByteBuf
 
 /** Represents a json token with parsing functionality. */

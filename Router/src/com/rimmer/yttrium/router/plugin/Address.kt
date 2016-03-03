@@ -1,4 +1,4 @@
-package com.rimmer.server.router.plugin
+package com.rimmer.yttrium.router.plugin
 
 import java.lang.reflect.Type
 import java.net.InetSocketAddress

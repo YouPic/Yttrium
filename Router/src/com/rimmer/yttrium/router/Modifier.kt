@@ -1,4 +1,4 @@
-package com.rimmer.server.router
+package com.rimmer.yttrium.router
 
 import java.lang.reflect.Type
 import java.util.*

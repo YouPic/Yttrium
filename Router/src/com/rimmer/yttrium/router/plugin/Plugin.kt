@@ -1,8 +1,8 @@
-package com.rimmer.server.router.plugin
+package com.rimmer.yttrium.router.plugin
 
-import com.rimmer.server.router.HttpMethod
-import com.rimmer.server.router.Modifier
-import com.rimmer.server.router.Swagger
+import com.rimmer.yttrium.router.HttpMethod
+import com.rimmer.yttrium.router.Modifier
+import com.rimmer.yttrium.router.Swagger
 import java.lang.reflect.Type
 import java.net.SocketAddress
 import kotlin.reflect.KParameter

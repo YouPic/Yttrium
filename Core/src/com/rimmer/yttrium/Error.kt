@@ -1,4 +1,4 @@
-package com.rimmer.server
+package com.rimmer.yttrium
 
 /*
  * Contains generic error types used within the server.
