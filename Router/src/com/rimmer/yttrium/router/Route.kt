@@ -108,12 +108,15 @@ class RouteContext(
 class Future<T> {
     fun succeed(v: T): Future<T> {
         then?.invoke(v)
+        result = v
         return this
     }
 
     fun then(f: (T) -> Unit) {
         then = f
+        result?.let {f(it)}
     }
 
     private var then: ((T) -> Unit)? = null
+    private var result: T? = null
 }

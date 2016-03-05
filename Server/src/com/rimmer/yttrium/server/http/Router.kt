@@ -34,7 +34,7 @@ class HttpRouter(
 
         // Find a matching route and parse its path parameters.
         val parameters = ArrayList<String>()
-        val route = findRoute(segmentTrees[method.ordinal], parameters, version, request.uri(), 0)
+        val route = findRoute(segmentTrees[method.ordinal], parameters, version, request.uri(), 1)
         if(route == null) {
             defaultHandler(request, f)
             return
