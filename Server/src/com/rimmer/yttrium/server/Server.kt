@@ -1,11 +1,10 @@
 package com.rimmer.yttrium.server
 
 import io.netty.bootstrap.ServerBootstrap
-import io.netty.channel.ChannelInitializer
-import io.netty.channel.ChannelPipeline
-import io.netty.channel.EventLoopGroup
+import io.netty.channel.*
 import io.netty.channel.epoll.Epoll
 import io.netty.channel.epoll.EpollEventLoopGroup
+import io.netty.channel.epoll.EpollServerSocketChannel
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
@@ -49,11 +48,20 @@ inline fun runServer(f: (ServerContext) -> Unit) {
  * The server then listens for requests using the built pipeline.
  * Note that the pipeline builder is called for each connection, and thus should cache any common data.
  */
-inline fun listen(context: ServerContext, port: Int, crossinline pipeline: ChannelPipeline.() -> Unit) = ServerBootstrap()
-    .group(context.acceptorGroup, context.handlerGroup)
-    .channel(NioServerSocketChannel::class.java)
-    .handler(LoggingHandler(LogLevel.INFO))
-    .childHandler(object: ChannelInitializer<SocketChannel>() {
+inline fun listen(context: ServerContext, port: Int, crossinline pipeline: ChannelPipeline.() -> Unit): ChannelFuture {
+    val channel = if(context.handlerGroup is EpollEventLoopGroup) {
+        EpollServerSocketChannel::class.java as Class<out ServerChannel>
+    } else {
+        NioServerSocketChannel::class.java
+    }
+    
+    val child = object: ChannelInitializer<SocketChannel>() {
         override fun initChannel(channel: SocketChannel) { pipeline(channel.pipeline()) }
-    })
-    .bind(port).sync().channel().closeFuture()
+    }
+
+    return ServerBootstrap()
+        .group(context.acceptorGroup, context.handlerGroup)
+        .channel(channel)
+        .childHandler(child)
+        .bind(port).sync().channel().closeFuture()
+}
