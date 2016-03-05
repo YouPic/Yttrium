@@ -11,6 +11,7 @@ enum class HttpMethod {GET, POST, DELETE, PUT}
  * @param method The HTTP calling method for this route.
  * @param version The route version - this allows using equivalent routes with different parameters.
  * @param segments The route path as it will be called through HTTP.
+ * @param typedSegments The path segments that will be bound the a parameter.
  * @param queries Any parameters that aren't provided through the path.
  * @param handler Takes request information for the route and executes it.
  */
@@ -18,8 +19,9 @@ class Route(
     val name: String,
     val method: HttpMethod,
     val version: Int,
-    val segments: List<PathSegment>,
-    val queries: List<RouteQuery>,
+    val segments: Array<PathSegment>,
+    val typedSegments: Array<PathSegment>,
+    val queries: Array<RouteQuery>,
     var handler: (RouteContext, RouteListener) -> Unit = {c, r ->}
 )
 
@@ -59,11 +61,12 @@ class RouteProperty(val name: String, val value: Any)
 /**
  * Represents a query parameter within a route.
  * @param name The parameter name as it appears in the url.
+ * @param hash The hash of the parameter name.
  * @param type The type this should be parsed to.
  * @param default If set, the parameter is optional and should be set to this if not provided.
  * @param description The provided description of this parameter.
  */
-class RouteQuery(val name: String, val type: Class<*>, val default: Any?, val description: String)
+class RouteQuery(val name: String, val hash: Int, val type: Class<*>, val default: Any?, val description: String)
 
 /**
  * When sent to a route handler, this will be called with progress information about the route.
@@ -92,7 +95,6 @@ interface RouteListener {
 }
 
 class RouteContext(
-    val callId: Long,
     val channel: ChannelHandlerContext,
     val pathParameters: Array<Any?>,
     val queryParameters: Array<Any?>

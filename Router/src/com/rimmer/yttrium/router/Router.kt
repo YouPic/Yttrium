@@ -6,11 +6,11 @@ import java.util.*
 class RoutePlugin(val plugin: Plugin<in Any>, val context: Any)
 
 class Router(val plugins: List<Plugin<in Any>>) {
-    private val routes = ArrayList<Route>()
-    private val swagger = Swagger()
-    private var currentCategory = swagger.addCategory("None")
+    val routes = ArrayList<Route>()
+    val swagger = Swagger()
+    var currentCategory = swagger.addCategory("None")
 
-    fun category(name: String, paths: Router.() -> Unit) {
+    inline fun category(name: String, paths: Router.() -> Unit) {
         val oldCategory = currentCategory
         currentCategory = swagger.addCategory(name)
         paths()
@@ -69,21 +69,20 @@ class Router(val plugins: List<Plugin<in Any>>) {
         }
 
         // Create a list of path parameter -> handler parameter bindings.
+        val typedSegments = segments.filter { it.type != null }.toTypedArray()
         val pathBindings = ArrayList<Int>()
-        for(s in segments) {
-            if(s.type != null) {
-                pathBindings.add(nextArg())
-                swaggerRoute.parameters.add(
-                    Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
-                )
-            }
+        for(s in typedSegments) {
+            pathBindings.add(nextArg())
+            swaggerRoute.parameters.add(
+                Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
+            )
         }
 
         // Create a list of query parameter -> handler parameter bindings.
         val queryBindings = ArrayList<Int>()
         for(q in desc.queries) {
             queryBindings.add(nextArg())
-            queries.add(RouteQuery(q.name, types[argIndex], q.default, q.description))
+            queries.add(RouteQuery(q.name, q.name.hashCode(), types[argIndex], q.default, q.description))
             swaggerRoute.parameters.add(
                 Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
             )
@@ -91,7 +90,8 @@ class Router(val plugins: List<Plugin<in Any>>) {
 
         // Create the route handler.
         val name = "$method ${swaggerRoute.info.path}"
-        val route = Route(name, method, version, segments, queries)
+        val route = Route(name, method, version, segments.toTypedArray(), typedSegments, queries.toTypedArray())
+
         route.handler = routeHandler(
             route,
             usedPlugins,
