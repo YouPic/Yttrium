@@ -11,15 +11,15 @@ import io.netty.util.ReferenceCountUtil
 fun listenHttp(
     context: ServerContext,
     port: Int,
-    handler: (FullHttpRequest, (HttpResponse) -> Unit) -> Unit
+    handler: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit
 ) = listen(context, port) {
     addLast(HttpResponseEncoder(), HttpRequestDecoder(), HttpObjectAggregator(10 * 1024 * 1024), HttpHandler(handler))
 }
 
-class HttpHandler(val f: (FullHttpRequest, (HttpResponse) -> Unit) -> Unit): ChannelInboundHandlerAdapter() {
+class HttpHandler(val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit): ChannelInboundHandlerAdapter() {
     override fun channelRead(context: ChannelHandlerContext, message: Any) {
         try {
-            if(message is FullHttpRequest) f(message) {
+            if(message is FullHttpRequest) f(context, message) {
                 if(HttpUtil.isKeepAlive(message)) {
                     val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
                     it.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength)
