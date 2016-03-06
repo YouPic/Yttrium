@@ -12,9 +12,7 @@
     <artifactId>Yttrium-Core</artifactId>
 
     <build>
-        <sourceDirectory>src</sourceDirectory>
-        <testSourceDirectory>tests</testSourceDirectory>
-
+        <sourceDirectory>${project.basedir}/src</sourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -29,7 +27,7 @@
                         </goals>
                         <configuration>
                             <sourceDirs>
-                                <source>src</source>
+                                <source>${project.basedir}/src</source>
                             </sourceDirs>
                         </configuration>
                     </execution>
