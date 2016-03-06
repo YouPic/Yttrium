@@ -55,16 +55,17 @@ class Router(val plugins: List<Plugin<in Any>>) {
             p.plugin.modifySwagger(p.context, swaggerRoute)
         }
 
-        var argIndex = 0
-
         // Returns the next handler argument that has no provider yet.
+        var argIndex = -1
         val nextArg = {
+            argIndex++
             while(providers[argIndex]) {
                 argIndex++
                 if(argIndex >= providers.size) {
                     throw IllegalArgumentException("The handler for this route has less arguments than there are in the route")
                 }
             }
+
             argIndex
         }
 

@@ -4,6 +4,7 @@ import com.rimmer.yttrium.*
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
 import java.util.*
+import kotlin.jvm.internal.Ref
 
 /**
  * Represents a type that can be serialized.
@@ -39,6 +40,7 @@ fun writeJson(value: Any?, target: ByteBuf) {
             is Char -> writer.value(value.toString())
             is Byte -> writer.value(value)
             is Short -> writer.value(value)
+            is Unit -> writer.startObject().endObject()
             else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
     }
@@ -66,6 +68,7 @@ fun writeBinary(value: Any?, target: ByteBuf) {
             is Char -> writer.writeString(value.toString())
             is Byte -> writer.writeVarInt(value.toInt())
             is Short -> writer.writeVarInt(value.toInt())
+            is Unit -> {}
             else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
     }
@@ -78,10 +81,10 @@ fun writeBinary(value: Any?, target: ByteBuf) {
  * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String.
  */
 fun readPrimitive(source: String, target: Class<*>): Any {
-    if(target == Int::class.java) {
-        return maybeParseInt(source) ?: throw InvalidStateException("Expected an integer")
-    } else if(target == Long::class.java) {
-        return maybeParseLong(source) ?: throw InvalidStateException("Expected an integer")
+    if(target == Int::class.javaObjectType) {
+        return maybeParseInt(source) ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
+    } else if(target == Long::class.javaObjectType) {
+        return maybeParseLong(source) ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
     } else if(target == String::class.java) {
         return source
     } else if(target == DateTime::class.java) {
@@ -89,35 +92,35 @@ fun readPrimitive(source: String, target: Class<*>): Any {
     } else if(target.isEnum) {
         return (target as Class<Enum<*>>).enumConstants.find {
             it.name == source
-        } ?: throw InvalidStateException("Expected instance of enum $target")
-    } else if(target == Boolean::class.java) {
+        } ?: throw InvalidStateException("\"$source\" is not an instance of enum $target")
+    } else if(target == Boolean::class.javaObjectType) {
         if(source == "true") return true
         else if(source == "false") return false
-        else throw InvalidStateException("Expected a boolean")
-    } else if(target == Float::class.java) {
+        else throw InvalidStateException("\"$source\" is not a boolean")
+    } else if(target == Float::class.javaObjectType) {
         try {
             return java.lang.Float.parseFloat(source)
         } catch(e: Exception) {
-            throw InvalidStateException("Expected a floating point value")
+            throw InvalidStateException("\"$source\" cannot be parsed as a number")
         }
-    } else if(target == Double::class.java) {
+    } else if(target == Double::class.javaObjectType) {
         try {
             return java.lang.Double.parseDouble(source)
         } catch(e: Exception) {
-            throw InvalidStateException("Expected a floating point value")
+            throw InvalidStateException("\"$source\" cannot be parsed as a number")
         }
-    } else if(target == Char::class.java) {
+    } else if(target == Char::class.javaObjectType) {
         if(source.length == 1) {
             return source[0]
         } else {
-            throw InvalidStateException("Expected a character")
+            throw InvalidStateException("\"$source\" is not a character")
         }
-    } else if(target == Byte::class.java) {
-        return maybeParseInt(source)?.toByte() ?: throw InvalidStateException("Expected an integer")
-    } else if(target == Short::class.java) {
-        return maybeParseInt(source)?.toShort() ?: throw InvalidStateException("Expected an integer")
+    } else if(target == Byte::class.javaObjectType) {
+        return maybeParseInt(source)?.toByte() ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
+    } else if(target == Short::class.javaObjectType) {
+        return maybeParseInt(source)?.toShort() ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
     } else {
-        throw InvalidStateException("Target type $target is not a primitive type.")
+        throw IllegalArgumentException("Target type $target is not a primitive type.")
     }
 }
 
@@ -173,6 +176,10 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
         } else if(target == Short::class.java) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toShort()
+        } else if(target == Unit::class.javaObjectType) {
+            reader.expect(JsonToken.Type.StartObject)
+            reader.expect(JsonToken.Type.EndObject)
+            return Unit
         } else {
             throw InvalidStateException("Value cannot be parsed into $target.")
         }
@@ -217,6 +224,8 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
             return reader.readVarInt().toByte()
         } else if(target == Short::class.java) {
             return reader.readVarInt().toShort()
+        } else if(target == Unit::class.javaObjectType) {
+            return Unit
         } else {
             throw InvalidStateException("Value cannot be parsed into $target.")
         }
