@@ -17,12 +17,17 @@ class Router(val plugins: List<Plugin<in Any>>) {
         currentCategory = oldCategory
     }
 
-    fun addRoute(desc: RouteBuilder, call: RouteContext.(Array<Any?>) -> Future<in Any>, types: Array<Class<*>>, result: Class<*>) {
-        val path = desc.path
-        val method = desc.method
-        val version = desc.version
-
-        val segments = buildSegments(path, types).toMutableList()
+    fun addRoute(
+        method: HttpMethod,
+        version: Int,
+        properties: List<RouteProperty>,
+        funSegments: Iterable<PathSegment>,
+        funQueries: Iterable<BuilderQuery>,
+        types: Array<Class<*>>,
+        result: Class<*>,
+        call: RouteContext.(Array<Any?>) -> Future<in Any>
+    ) {
+        val segments = funSegments.toMutableList()
         val queries = ArrayList<RouteQuery>()
         val providers = Array(types.size) { false }
 
@@ -54,7 +59,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         // Find the plugins that will be applied to this route.
         val usedPlugins = ArrayList<RoutePlugin>()
         for(p in plugins) {
-            val context = p.isUsed(modifier, result, desc.properties)
+            val context = p.isUsed(modifier, result, properties)
             if(context != null) {
                 usedPlugins.add(RoutePlugin(p, context))
                 p.modifyRoute(context, modifier)
@@ -63,8 +68,8 @@ class Router(val plugins: List<Plugin<in Any>>) {
 
         // Create the swagger route.
         val swaggerRoute = Swagger.Route(
-            Swagger.PathInfo(buildSwaggerPath(segments), buildEquivalencePath(segments), currentCategory.name),
-            method, version
+                Swagger.PathInfo(buildSwaggerPath(segments), buildEquivalencePath(segments), currentCategory.name),
+                method, version
         )
         swagger.addRoute(swaggerRoute, currentCategory)
 
@@ -93,17 +98,17 @@ class Router(val plugins: List<Plugin<in Any>>) {
         for(s in typedSegments) {
             pathBindings.add(nextArg())
             swaggerRoute.parameters.add(
-                Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
+                    Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
             )
         }
 
         // Create a list of query parameter -> handler parameter bindings.
         val queryBindings = ArrayList<Int>()
-        for(q in desc.queries) {
+        for(q in funQueries) {
             queryBindings.add(nextArg())
             queries.add(RouteQuery(q.name, q.name.hashCode(), types[argIndex], q.optional, q.default, q.description))
             swaggerRoute.parameters.add(
-                Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
+                    Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
             )
         }
 
@@ -120,6 +125,10 @@ class Router(val plugins: List<Plugin<in Any>>) {
             call
         )
         routes.add(route)
+    }
+
+    fun addRoute(desc: RouteBuilder, call: RouteContext.(Array<Any?>) -> Future<in Any>, types: Array<Class<*>>, result: Class<*>) {
+        addRoute(desc.method, desc.version, desc.properties, buildSegments(desc.path, types), desc.queries, types, result, call)
     }
 
     fun get(path: String, version: Int = 0) = RouteBuilder(this, HttpMethod.GET, path, version)
