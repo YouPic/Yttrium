@@ -34,7 +34,7 @@ class HttpHandler(val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse)
                     val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
                     it.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength)
                     it.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
-                    context.writeAndFlush(it)
+                    context.writeAndFlush(it, context.voidPromise())
                 } else {
                     context.writeAndFlush(it).addListener(ChannelFutureListener.CLOSE)
                 }

@@ -3,9 +3,9 @@ package com.rimmer.yttrium.server
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.*
 import io.netty.channel.epoll.EpollEventLoopGroup
-import io.netty.channel.epoll.EpollServerSocketChannel
+import io.netty.channel.epoll.EpollSocketChannel
 import io.netty.channel.socket.SocketChannel
-import io.netty.channel.socket.nio.NioServerSocketChannel
+import io.netty.channel.socket.nio.NioSocketChannel
 
 /** Connects to a remote server as a client. */
 inline fun connect(
@@ -17,9 +17,9 @@ inline fun connect(
     crossinline onFail: (Throwable?) -> Unit
 ): ChannelFuture {
     val channel = if(context.handlerGroup is EpollEventLoopGroup) {
-        EpollServerSocketChannel::class.java as Class<out ServerChannel>
+        EpollSocketChannel::class.java
     } else {
-        NioServerSocketChannel::class.java
+        NioSocketChannel::class.java
     }
 
     val init = object: ChannelInitializer<SocketChannel>() {

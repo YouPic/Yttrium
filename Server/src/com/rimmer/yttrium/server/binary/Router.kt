@@ -18,7 +18,8 @@ enum class ResponseCode {
     Success, NoRoute, NotFound, InvalidArgs, NoPermission, InternalError
 }
 
-fun routeHash(r: Route) = r.name.hashCode() * r.version * 3452056
+fun routeHash(r: Route) = routeHash(r.name, r.version)
+fun routeHash(name: String, version: Int = 0) = name.hashCode() + version * 3452056
 
 class BinaryRouter(
     val router: Router,

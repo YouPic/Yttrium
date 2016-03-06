@@ -11,7 +11,6 @@ import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.connect
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
-import io.netty.channel.ChannelPipeline
 import java.util.*
 
 interface BinaryClient {
@@ -26,22 +25,25 @@ fun connectBinary(
     timeout: Int = 0,
     onConnect: (BinaryClient?, Throwable?) -> Unit
 ) = connect(context, host, port, timeout, {
-    val client = BinaryClientHandler(this)
-    addLast(client)
-    onConnect(client, null)
+    addLast(BinaryClientHandler(onConnect))
 }, {
     onConnect(null, it)
 })
 
-class BinaryClientHandler(pipeline: ChannelPipeline): BinaryDecoder(), BinaryClient {
+class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): BinaryDecoder(), BinaryClient {
     private data class Request(val target: Class<*>, val handler: (Any?, Throwable?) -> Unit)
 
-    private val context = pipeline.context(this)
+    private var context: ChannelHandlerContext? = null
     private val requests = ArrayList<Request?>()
     private var nextRequest = 0
 
+    override fun channelActive(context: ChannelHandlerContext) {
+        this.context = context
+        onConnect(this, null)
+    }
+
     override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit) {
-        writePacket(context, addRequest(Request(target, f))) { target, commit ->
+        writePacket(context!!, addRequest(Request(target, f))) { target, commit ->
             target.writeVarInt(route)
             for(p in path) {
                 writeBinary(p, target)
@@ -49,11 +51,12 @@ class BinaryClientHandler(pipeline: ChannelPipeline): BinaryDecoder(), BinaryCli
             for(q in queries) {
                 writeBinary(q, target)
             }
+            commit()
         }
     }
 
     override fun close() {
-        context.close()
+        context!!.close()
     }
 
     override fun handlePacket(context: ChannelHandlerContext, request: Int, packet: ByteBuf) {

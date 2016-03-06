@@ -13,7 +13,7 @@ open class BinaryDecoder: ChannelInboundHandlerAdapter() {
     override fun channelRead(context: ChannelHandlerContext, message: Any) {
         if(message is ByteBuf) {
             // If we had leftover data in the previous chunk it is added to the beginning of the next packet.
-            val packet = if(accumulator == null) {
+            val packet = if(accumulator != null) {
                 Unpooled.wrappedBuffer(accumulator, message)
             } else message
 
@@ -43,15 +43,16 @@ open class BinaryDecoder: ChannelInboundHandlerAdapter() {
 }
 
 inline fun readPacket(source: ByteBuf, f: (Int, ByteBuf) -> Unit): Boolean {
-    if(source.readableBytes() <= 2) return false
+    if(source.readableBytes() <= 4) return false
     source.markReaderIndex()
 
     // Each packet starts with a packet length and a request id.
     val length = source.readInt()
+    val index = source.readerIndex()
     val request = source.readVarInt()
 
     // If we don't have the full buffer yet we wait for more data.
-    if(source.readableBytes() < length) {
+    if(source.readableBytes() + (source.readerIndex() - index) < length) {
         source.resetReaderIndex()
         return false
     } else {
@@ -70,6 +71,6 @@ inline fun writePacket(context: ChannelHandlerContext, request: Int, writer: (By
     writer(target) {
         // Set the final packet size.
         target.setInt(0, target.writerIndex() - 4)
-        context.writeAndFlush(target)
+        context.writeAndFlush(target, context.voidPromise())
     }
 }
