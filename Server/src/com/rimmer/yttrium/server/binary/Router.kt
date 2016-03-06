@@ -18,11 +18,13 @@ enum class ResponseCode {
     Success, NoRoute, NotFound, InvalidArgs, NoPermission, InternalError
 }
 
+fun routeHash(r: Route) = r.name.hashCode() * r.version * 3452056
+
 class BinaryRouter(
     val router: Router,
     val listener: RouteListener? = null
 ): (ChannelHandlerContext, ByteBuf, ByteBuf, () -> Unit) -> Unit {
-    private val segmentMap = router.routes.associateBy { it.name.hashCode() * it.version * 3452056 }
+    private val segmentMap = router.routes.associateBy { routeHash(it) }
 
     override fun invoke(context: ChannelHandlerContext, source: ByteBuf, target: ByteBuf, f: () -> Unit) {
         val id = source.readVarInt()
