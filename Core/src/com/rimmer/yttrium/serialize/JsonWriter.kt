@@ -53,7 +53,29 @@ class JsonWriter(val buffer: ByteBuf) {
 
     fun value(s: String): JsonWriter {
         buffer.writeByte('"'.toInt())
-        buffer.writeBytes(s.toByteArray())
+        val escaped = StringBuilder(s.length)
+        for(c in s) {
+            if(c == '"') {
+                escaped.append("\\\"")
+            } else if(c == '\\') {
+                escaped.append("\\\\")
+            } else if(c < 0x20.toChar()) {
+                if (c == '\b') {
+                    escaped.append("\\b")
+                } else if (c == 0x0C.toChar()) {
+                    escaped.append("\\f")
+                } else if (c == '\n') {
+                    escaped.append("\\n")
+                } else if (c == '\r') {
+                    escaped.append("\\r")
+                } else if (c == '\t') {
+                    escaped.append("\\t")
+                }
+            } else {
+                escaped.append(c)
+            }
+        }
+        buffer.writeBytes(escaped.toString().toByteArray())
         buffer.writeByte('"'.toInt())
         return this
     }
