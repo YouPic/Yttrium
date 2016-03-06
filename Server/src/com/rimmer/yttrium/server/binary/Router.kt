@@ -7,10 +7,7 @@ import com.rimmer.yttrium.router.Route
 import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.RouteListener
 import com.rimmer.yttrium.router.Router
-import com.rimmer.yttrium.serialize.readBinary
-import com.rimmer.yttrium.serialize.readVarInt
-import com.rimmer.yttrium.serialize.writeBinary
-import com.rimmer.yttrium.serialize.writeString
+import com.rimmer.yttrium.serialize.*
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 
@@ -44,8 +41,19 @@ class BinaryRouter(
                 params[i] = readBinary(source, segment.type!!)
             }
 
+            val nullMap = source.readVarLong()
             route.queries.forEachIndexed { i, query ->
-                queries[i] = readBinary(source, query.type)
+                if((nullMap and (1L shl i)) != 0L) {
+                    queries[i] = readBinary(source, query.type)
+                } else if(query.optional) {
+                    queries[i] = query.default
+                } else {
+                    val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
+                    val type = "of type ${query.type.simpleName}"
+                    throw InvalidStateException(
+                        "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type"
+                    )
+                }
             }
 
             route.handler(RouteContext(context, params, queries), object: RouteListener {

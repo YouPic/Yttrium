@@ -203,7 +203,7 @@ fun checkQueries(route: Route, args: Array<Any?>) {
     route.queries.forEachIndexed { i, query ->
         val v = args[i]
         if(v == null) {
-            if(query.default != null) {
+            if(query.optional) {
                 args[i] = query.default
             } else {
                 val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
