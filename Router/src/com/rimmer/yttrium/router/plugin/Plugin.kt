@@ -26,10 +26,11 @@ interface Plugin<Context> {
     /**
      * Adds any function parameters needed for this plugin before calling the route handler.
      * This is called for every request to this route.
+     * When done, call the provided callback to continue the route request.
      * @param arguments A list of arguments with the same order as in isUsed.
      * The plugin should set any arguments it indicated itself as a provider for.
      */
-    fun modifyCall(context: Context, route: RouteContext, arguments: Array<Any?>) {}
+    fun modifyCall(context: Context, route: RouteContext, arguments: Array<Any?>, f: () -> Unit) = f()
 
     /**
      * Modifies the result returned by the route handler if needed.

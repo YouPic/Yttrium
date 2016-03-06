@@ -29,10 +29,25 @@ class Router(val plugins: List<Plugin<in Any>>) {
         val modifier = object: RouteModifier {
             override val parameterTypes: Array<Class<*>> get() = types
             override fun provideParameter(index: Int) { providers[index] = true }
-            override fun addPath(s: List<PathSegment>) { segments.addAll(s) }
-            override fun addQuery(name: String, type: Class<*>, default: Any?, description: String) {
+
+            override fun addPath(s: List<PathSegment>): Int {
+                val id = segments.sumBy { if(it.type != null) 1 else 0 }
+                segments.addAll(s)
+                return id
+            }
+
+            override fun addArg(name: String, type: Class<*>, description: String): Int {
                 val hash = name.hashCode()
-                queries.add(RouteQuery(name, hash, type, default, description))
+                val id = queries.size
+                queries.add(RouteQuery(name, hash, type, false, null, description))
+                return id
+            }
+
+            override fun addOptional(name: String, type: Class<*>, default: Any?, description: String): Int {
+                val hash = name.hashCode()
+                val id = queries.size
+                queries.add(RouteQuery(name, hash, type, true, default, description))
+                return id
             }
         }
 
@@ -86,7 +101,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         val queryBindings = ArrayList<Int>()
         for(q in desc.queries) {
             queryBindings.add(nextArg())
-            queries.add(RouteQuery(q.name, q.name.hashCode(), types[argIndex], q.default, q.description))
+            queries.add(RouteQuery(q.name, q.name.hashCode(), types[argIndex], q.optional, q.default, q.description))
             swaggerRoute.parameters.add(
                 Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
             )

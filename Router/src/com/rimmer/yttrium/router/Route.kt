@@ -39,11 +39,21 @@ interface RouteModifier {
     /**
      * Adds to the calling url of this route.
      * @param segments A list of segments to add - this can contain both string and parameter segments.
+     * @return The id of the created parameter for the first typed segment. This can be used to retrieve it in modifyCall.
      */
-    fun addPath(segments: List<PathSegment>)
+    fun addPath(segments: List<PathSegment>): Int
 
-    /** Adds an additional query parameter. */
-    fun addQuery(name: String, type: Class<*>, default: Any? = null, description: String = "")
+    /**
+     * Adds an additional query parameter.
+     * @return The id of the created query. This can be used to retrieve it in modifyCall.
+     */
+    fun addArg(name: String, type: Class<*>, description: String = ""): Int
+
+    /**
+     * Adds an additional optional query parameter.
+     * @return The id of the created query. This can be used to retrieve it in modifyCall.
+     */
+    fun addOptional(name: String, type: Class<*>, default: Any? = null, description: String = ""): Int
 
     /** Returns the index of the first argument of the provided type, or null. */
     fun hasParameter(type: Class<*>): Int? {
@@ -73,7 +83,14 @@ class RouteProperty(val name: String, val value: Any)
  * @param default If set, the parameter is optional and should be set to this if not provided.
  * @param description The provided description of this parameter.
  */
-class RouteQuery(val name: String, val hash: Int, val type: Class<*>, val default: Any?, val description: String)
+class RouteQuery(
+    val name: String,
+    val hash: Int,
+    val type: Class<*>,
+    val optional: Boolean,
+    val default: Any?,
+    val description: String
+)
 
 /**
  * When sent to a route handler, this will be called with progress information about the route.

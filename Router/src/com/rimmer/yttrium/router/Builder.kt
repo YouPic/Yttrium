@@ -2,7 +2,7 @@ package com.rimmer.yttrium.router
 
 import java.util.*
 
-class BuilderQuery(val name: String, val default: Any?, val description: String)
+class BuilderQuery(val name: String, val optional: Boolean, val default: Any?, val description: String)
 
 class RouteBuilder(val router: Router, val method: HttpMethod, val path: String, val version: Int) {
     internal val queries = ArrayList<BuilderQuery>()
@@ -13,15 +13,13 @@ class RouteBuilder(val router: Router, val method: HttpMethod, val path: String,
         return this
     }
 
-    infix fun query(name: String) = query(name, "")
-
-    fun query(name: String, description: String): RouteBuilder {
-        queries.add(BuilderQuery(name, null, description))
+    fun arg(name: String, description: String = ""): RouteBuilder {
+        queries.add(BuilderQuery(name, false, null, description))
         return this
     }
 
-    fun query(name: String, default: Any?, description: String = ""): RouteBuilder {
-        queries.add(BuilderQuery(name, default, description))
+    fun optional(name: String, default: Any? = null, description: String = ""): RouteBuilder {
+        queries.add(BuilderQuery(name, true, default, description))
         return this
     }
 
