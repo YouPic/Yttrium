@@ -4,12 +4,16 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.parseInt
 import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
+import com.rimmer.yttrium.serialize.JsonToken
 import com.rimmer.yttrium.serialize.readPrimitive
 import com.rimmer.yttrium.serialize.writeJson
 import com.rimmer.yttrium.sliceHash
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*
+import io.netty.util.AsciiString
 import java.util.*
+
+val jsonContentType = AsciiString("application/json")
 
 class HttpRouter(
     val router: Router,
@@ -59,7 +63,9 @@ class HttpRouter(
                     val buffer = context.alloc().buffer()
                     try {
                         writeJson(result, buffer)
-                        f(DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer))
+                        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer)
+                        response.headers().set(HttpHeaderNames.CONTENT_TYPE, jsonContentType)
+                        f(response)
                         listener?.onSucceed(callId, route, result)
                     } catch(e: Throwable) { fail(e) }
                 }
@@ -198,8 +204,10 @@ fun checkQueries(route: Route, args: Array<Any?>) {
         val v = args[i]
         if(v == null && query.default != null) {
             args[i] = query.default
-        } else throw InvalidStateException(
-            "Request to ${route.name} is missing required query parameter ${query.name} of type ${query.type.canonicalName}"
-        )
+        } else {
+            val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
+            val type = "of type ${query.type.simpleName}"
+            throw InvalidStateException("Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type")
+        }
     }
 }
