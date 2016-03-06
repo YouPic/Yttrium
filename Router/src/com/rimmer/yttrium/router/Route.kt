@@ -84,14 +84,14 @@ interface RouteListener {
      * @param id The id that was previously returned by onStart.
      * @param result The returned result of the route.
      */
-    fun onSucceed(id: Long, result: Any?)
+    fun onSucceed(id: Long, route: Route, result: Any?)
 
     /**
      * This is called whenever a route call fails.
      * @param id The id that was previously returned by onStart.
      * @param reason The reason this call failed, if any.
      */
-    fun onFail(id: Long, reason: Throwable?)
+    fun onFail(id: Long, route: Route, reason: Throwable?)
 }
 
 class RouteContext(

@@ -40,14 +40,14 @@ fun routeHandler(
                     modify(plugin, it)
                 }
             } else {
-                listener.onSucceed(listenerId, result)
+                listener.onSucceed(listenerId, route, result)
             }
         }
 
         // Call the actual api function and send its result to the plugin modifier.
         context.call(arguments).then { modify(plugins.iterator(), it) }
     } catch(e: Throwable) {
-        listener.onFail(listenerId, e)
+        listener.onFail(listenerId, route, e)
     }
 }
 

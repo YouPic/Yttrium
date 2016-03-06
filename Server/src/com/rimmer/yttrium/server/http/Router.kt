@@ -43,23 +43,27 @@ class HttpRouter(
         val callId = listener?.onStart(route) ?: 0
         val fail = {e: Throwable? ->
             f(mapError(e))
-            listener?.onFail(callId, e)
+            listener?.onFail(callId, route, e)
         }
 
         try {
             val params = parseParameters(route, parameters)
             val queries = parseQuery(route, request.uri())
+
+            // TODO: Parse request body here if needed.
+
+            checkQueries(route, queries)
             route.handler(RouteContext(context, params, queries), object: RouteListener {
                 override fun onStart(route: Route) = 0L
-                override fun onSucceed(id: Long, result: Any?) {
+                override fun onSucceed(id: Long, route: Route, result: Any?) {
                     val buffer = context.alloc().buffer()
                     try {
                         writeJson(result, buffer)
                         f(DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer))
-                        listener?.onSucceed(callId, result)
+                        listener?.onSucceed(callId, route, result)
                     } catch(e: Throwable) { fail(e) }
                 }
-                override fun onFail(id: Long, reason: Throwable?) { fail(reason) }
+                override fun onFail(id: Long, route: Route, reason: Throwable?) { fail(reason) }
             })
         } catch(e: Throwable) { fail(e) }
     }
@@ -168,9 +172,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
         val queries = query.split('&')
 
         // Parse each query parameter.
-        var i = 0
-        while(i < queries.size) {
-            val q = queries[i]
+        queries.forEach { q ->
             val separator = q.indexOf('=')
             if(separator == -1) {
                 // Bad syntax.
@@ -188,4 +190,16 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
     }
 
     return values
+}
+
+/** Makes sure that all required query parameters have been set correctly. */
+fun checkQueries(route: Route, args: Array<Any?>) {
+    route.queries.forEachIndexed { i, query ->
+        val v = args[i]
+        if(v == null && query.default != null) {
+            args[i] = query.default
+        } else throw InvalidStateException(
+            "Request to ${route.name} is missing required query parameter ${query.name} of type ${query.type.canonicalName}"
+        )
+    }
 }
