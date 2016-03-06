@@ -43,12 +43,19 @@ interface RouteModifier {
     fun addPath(segments: List<PathSegment>)
 
     /** Adds an additional query parameter. */
-    fun addQuery(query: RouteQuery)
+    fun addQuery(name: String, type: Class<*>, default: Any? = null, description: String = "")
 
     /** Returns the index of the first argument of the provided type, or null. */
     fun hasParameter(type: Class<*>): Int? {
         val i = parameterTypes.indexOf(type)
         return if(i == -1) null else i
+    }
+
+    /** If a parameter of the requested type exists, provide it and return its index. */
+    fun provideIfExists(type: Class<*>): Int? {
+        val i = hasParameter(type)
+        if(i != null) provideParameter(i)
+        return i
     }
 }
 

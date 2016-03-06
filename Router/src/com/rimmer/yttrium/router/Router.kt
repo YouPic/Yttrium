@@ -30,7 +30,10 @@ class Router(val plugins: List<Plugin<in Any>>) {
             override val parameterTypes: Array<Class<*>> get() = types
             override fun provideParameter(index: Int) { providers[index] = true }
             override fun addPath(s: List<PathSegment>) { segments.addAll(s) }
-            override fun addQuery(query: RouteQuery) { queries.add(query) }
+            override fun addQuery(name: String, type: Class<*>, default: Any?, description: String) {
+                val hash = name.hashCode()
+                queries.add(RouteQuery(name, hash, type, default, description))
+            }
         }
 
         // Find the plugins that will be applied to this route.
