@@ -2,52 +2,45 @@ package com.rimmer.yttrium.serialize
 
 import io.netty.buffer.ByteBuf
 
-/** Helper functions for writing binary data. */
-class BinaryWriter(val buffer: ByteBuf) {
-    fun endObject() {
-        buffer.writeByte(0)
-    }
+/*
+ * Helper functions for writing binary data.
+ */
 
-    fun writeFieldId(id: Int) {
-        buffer.writeByte(id)
-    }
+fun ByteBuf.endObject() {
+    writeByte(0)
+}
 
-    fun writeString(s: String) {
-        writeVarInt(s.length)
-        buffer.writeBytes(s.toByteArray())
-    }
+fun ByteBuf.writeFieldId(id: Int) {
+    writeByte(id)
+}
 
-    fun writeVarInt(value: Int) {
-        var v = value
-        while(v != 0) {
-            if(v and 0x7f.inv() != 0) {
-                buffer.writeByte(v.toInt() or 0x80)
-            } else {
-                buffer.writeByte(v.toInt())
-            }
+fun ByteBuf.writeString(s: String) {
+    writeVarInt(s.length)
+    writeBytes(s.toByteArray())
+}
 
-            v = v shr 7
+fun ByteBuf.writeVarInt(value: Int) {
+    var v = value
+    while(v != 0) {
+        if(v and 0x7f.inv() != 0) {
+            writeByte(v.toInt() or 0x80)
+        } else {
+            writeByte(v.toInt())
         }
+
+        v = v shr 7
     }
+}
 
-    fun writeVarLong(value: Long) {
-        var v = value
-        while(v != 0L) {
-            if(v and 0x7fL.inv() != 0L) {
-                buffer.writeByte(v.toInt() or 0x80)
-            } else {
-                buffer.writeByte(v.toInt())
-            }
-
-            v = v shr 7
+fun ByteBuf.writeVarLong(value: Long) {
+    var v = value
+    while(v != 0L) {
+        if(v and 0x7fL.inv() != 0L) {
+            writeByte(v.toInt() or 0x80)
+        } else {
+            writeByte(v.toInt())
         }
-    }
 
-    fun writeFloat(value: Float) {
-        buffer.writeFloat(value)
-    }
-
-    fun writeDouble(value: Double) {
-        buffer.writeDouble(value)
+        v = v shr 7
     }
 }

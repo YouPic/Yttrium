@@ -4,7 +4,6 @@ import com.rimmer.yttrium.*
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
 import java.util.*
-import kotlin.jvm.internal.Ref
 
 /**
  * Represents a type that can be serialized.
@@ -55,19 +54,18 @@ fun writeBinary(value: Any?, target: ByteBuf) {
     if(value is Writable) {
         value.encodeBinary(target)
     } else {
-        val writer = BinaryWriter(target)
         when(value) {
-            is Int -> writer.writeVarInt(value)
-            is Long -> writer.writeVarLong(value)
-            is String -> writer.writeString(value)
-            is DateTime -> writer.writeVarLong(value.millis)
-            is Enum<*> -> writer.writeVarInt(value.ordinal)
-            is Boolean -> writer.writeVarInt(if(value) 1 else 0)
-            is Float -> writer.writeFloat(value)
-            is Double -> writer.writeDouble(value)
-            is Char -> writer.writeString(value.toString())
-            is Byte -> writer.writeVarInt(value.toInt())
-            is Short -> writer.writeVarInt(value.toInt())
+            is Int -> target.writeVarInt(value)
+            is Long -> target.writeVarLong(value)
+            is String -> target.writeString(value)
+            is DateTime -> target.writeVarLong(value.millis)
+            is Enum<*> -> target.writeVarInt(value.ordinal)
+            is Boolean -> target.writeVarInt(if(value) 1 else 0)
+            is Float -> target.writeFloat(value)
+            is Double -> target.writeDouble(value)
+            is Char -> target.writeString(value.toString())
+            is Byte -> target.writeVarInt(value.toInt())
+            is Short -> target.writeVarInt(value.toInt())
             is Unit -> {}
             else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
@@ -196,34 +194,33 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
     if(readable != null) {
         return readable.fromBinary(buffer)
     } else {
-        val reader = BinaryReader(buffer)
         if(target == Int::class.java) {
-            return reader.readVarInt()
+            return buffer.readVarInt()
         } else if(target == Long::class.java) {
-            return reader.readVarLong()
+            return buffer.readVarLong()
         } else if(target == String::class.java) {
-            return reader.readString()
+            return buffer.readString()
         } else if(target == DateTime::class.java) {
-            return DateTime(reader.readVarLong())
+            return DateTime(buffer.readVarLong())
         } else if(target.isEnum) {
-            val index = reader.readVarInt()
+            val index = buffer.readVarInt()
             val values = (target as Class<Enum<*>>).enumConstants
             if(values.size <= index || index < 0) {
                 throw InvalidStateException("Expected instance of enum $target")
             }
             return values[index]
         } else if(target == Boolean::class.java) {
-            return if(reader.readVarInt() == 0) false else true
+            return if(buffer.readVarInt() == 0) false else true
         } else if(target == Float::class.java) {
-            return reader.readFloat()
+            return buffer.readFloat()
         } else if(target == Double::class.java) {
-            return reader.readDouble()
+            return buffer.readDouble()
         } else if(target == Char::class.java) {
-            return reader.readString().firstOrNull() ?: ' '
+            return buffer.readString().firstOrNull() ?: ' '
         } else if(target == Byte::class.java) {
-            return reader.readVarInt().toByte()
+            return buffer.readVarInt().toByte()
         } else if(target == Short::class.java) {
-            return reader.readVarInt().toShort()
+            return buffer.readVarInt().toShort()
         } else if(target == Unit::class.javaObjectType) {
             return Unit
         } else {
