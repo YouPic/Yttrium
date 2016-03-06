@@ -28,7 +28,7 @@ fun ByteBuf.writeVarInt(value: Int) {
             writeByte(v.toInt())
         }
 
-        v = v shr 7
+        v = v ushr 7
     } while(v != 0)
 }
 
@@ -42,6 +42,6 @@ fun ByteBuf.writeVarLong(value: Long) {
             writeByte(v.toInt())
         }
 
-        v = v shr 7
+        v = v ushr 7
     } while(v != 0L)
 }

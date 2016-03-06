@@ -26,26 +26,33 @@ fun routeHandler(
             queryIndex++
         }
 
-        // Let each plugin modify the call as needed.
-        for(p in plugins) {
-            p.plugin.modifyCall(p.context, context, arguments)
-        }
-
         // Let each plugin modify the result as needed.
         // After each plugin has run, we send the final result to the route listener.
-        fun modify(plugin: Iterator<RoutePlugin>, result: Any?) {
+        fun modifyResult(plugin: Iterator<RoutePlugin>, result: Any?) {
             if (plugin.hasNext()) {
                 val p = plugin.next()
                 p.plugin.modifyResult(p.context, context, result) {
-                    modify(plugin, it)
+                    modifyResult(plugin, it)
                 }
             } else {
                 listener.onSucceed(listenerId, route, result)
             }
         }
 
-        // Call the actual api function and send its result to the plugin modifier.
-        context.call(arguments).then { modify(plugins.iterator(), it) }
+        // Let each plugin modify the call as needed.
+        // After each plugin has run, we call the route handler.
+        fun modifyCall(plugin: Iterator<RoutePlugin>, args: Array<Any?>) {
+            if (plugin.hasNext()) {
+                val p = plugin.next()
+                p.plugin.modifyCall(p.context, context, args) {
+                    modifyCall(plugin, args)
+                }
+            } else {
+                context.call(args).then { modifyResult(plugins.iterator(), it) }
+            }
+        }
+
+        modifyCall(plugins.iterator(), arguments)
     } catch(e: Throwable) {
         listener.onFail(listenerId, route, e)
     }

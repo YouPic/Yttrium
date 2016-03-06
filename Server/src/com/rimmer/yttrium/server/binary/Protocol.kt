@@ -2,6 +2,7 @@ package com.rimmer.yttrium.server.binary
 
 import com.rimmer.yttrium.serialize.readVarInt
 import com.rimmer.yttrium.serialize.writeVarInt
+import com.rimmer.yttrium.serialize.writeVarLong
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
@@ -73,4 +74,14 @@ inline fun writePacket(context: ChannelHandlerContext, request: Int, writer: (By
         target.setInt(0, target.writerIndex() - 4)
         context.writeAndFlush(target, context.voidPromise())
     }
+}
+
+fun writeNullMap(values: Array<Any?>, target: ByteBuf) {
+    var map = 0L
+    values.forEachIndexed { i, v ->
+        if(v != null) {
+            map = map or (1L shl i)
+        }
+    }
+    target.writeVarLong(map)
 }
