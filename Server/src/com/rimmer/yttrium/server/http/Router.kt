@@ -186,7 +186,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             }
 
             // Check if this parameter is used.
-            val name = q.substring(0, separator).hashCode()
+            val name = q.sliceHash(0, separator)
             params.forEachIndexed { i, query ->
                 if(query.hash == name) {
                     values[i] = readPrimitive(q.substring(separator + 1), query.type)
@@ -202,12 +202,16 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
 fun checkQueries(route: Route, args: Array<Any?>) {
     route.queries.forEachIndexed { i, query ->
         val v = args[i]
-        if(v == null && query.default != null) {
-            args[i] = query.default
-        } else {
-            val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
-            val type = "of type ${query.type.simpleName}"
-            throw InvalidStateException("Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type")
+        if(v == null) {
+            if(query.default != null) {
+                args[i] = query.default
+            } else {
+                val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
+                val type = "of type ${query.type.simpleName}"
+                throw InvalidStateException(
+                    "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type"
+                )
+            }
         }
     }
 }
