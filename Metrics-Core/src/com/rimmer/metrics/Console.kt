@@ -1,5 +1,7 @@
 package com.rimmer.metrics
 
+import com.rimmer.metrics.generated.type.*
+
 /** A metrics sender that writes to stdout. */
 class ConsoleSender: Sender {
     override fun sendProfile(profile: ProfilePacket) {

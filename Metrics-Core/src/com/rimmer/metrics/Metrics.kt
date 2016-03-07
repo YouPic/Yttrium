@@ -1,5 +1,6 @@
 package com.rimmer.metrics
 
+import com.rimmer.metrics.generated.type.*
 import org.joda.time.DateTime
 import java.util.*
 
@@ -106,7 +107,7 @@ class Metrics: MetricsWriter {
                 val calls = ArrayList<Call>(path.calls.size)
                 path.calls.filterTo(calls) {
                     if (it.error) {
-                        sendError(ErrorPacket(it.path, it.startDate, it.failReason, it.failTrace, it.parameters))
+                        sendError(ErrorPacket(it.path, it.startDate, it.failReason, it.failTrace))
                     }
                     !it.failed
                 }
@@ -135,7 +136,7 @@ class Metrics: MetricsWriter {
                 val max = calls[count - 1]
 
                 // Send the timing intervals for calculating statistics.
-                sendStatistic(StatPacket(min.path, "", date, totalTime, calls.map {Interval(it.startTime, it.endTime)}))
+                sendStatistic(StatPacket(min.path, "", date, totalTime, calls.map { Interval(it.startTime, it.endTime) }.toCollection(ArrayList())))
 
                 // Send a full profile for the median and maximum values.
                 sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
