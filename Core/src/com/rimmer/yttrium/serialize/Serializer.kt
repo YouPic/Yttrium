@@ -18,6 +18,32 @@ interface Writable {
 }
 
 /**
+ * This is a special wrapper around String,
+ * which when stored will contain the raw string instead of being serialized to json.
+ */
+data class RawString(val value: String): Writable {
+    override fun encodeJson(buffer: ByteBuf) {
+        buffer.writeBytes(value.toByteArray())
+    }
+
+    override fun encodeBinary(buffer: ByteBuf) {
+        buffer.writeString(value)
+    }
+
+    companion object {
+        init {
+            registerReadable(RawString::class.java, {
+                val bytes = ByteArray(it.readableBytes())
+                it.readBytes(bytes)
+                RawString(String(bytes))
+            }, {
+                RawString(it.readString())
+            })
+        }
+    }
+}
+
+/**
  * Stores a value as json.
  * The value must be either a Writable type, or any of the following builtin types:
  * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String, Enum.
