@@ -112,6 +112,12 @@ class Router(val plugins: List<Plugin<in Any>>) {
             }
         }
 
+        // If the segment list is empty, we have a root path.
+        // Since the root still technically has one segment (an empty one) we add it ourselves.
+        if(segments.isEmpty()) {
+            segments.add(PathSegment("", null))
+        }
+
         // Create the route handler.
         val name = "$method ${swaggerRoute.info.path}"
         val inputSegments = segments.filter { it.type != null }.toTypedArray()
