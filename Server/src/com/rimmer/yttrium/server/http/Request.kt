@@ -8,7 +8,7 @@ import io.netty.buffer.Unpooled
 import io.netty.handler.codec.http.*
 
 fun httpDefault(r: HttpRequest, f: (HttpResponse) -> Unit) {
-    val response = DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED)
+    val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED)
     response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN)
     f(response)
 }
