@@ -34,6 +34,15 @@ class JsonWriter(val buffer: ByteBuf) {
         return this
     }
 
+    fun arrayField(): JsonWriter {
+        if(hasValue < depth) {
+            hasValue = depth
+        } else {
+            buffer.writeByte(','.toInt())
+        }
+        return this
+    }
+
     fun field(name: ByteArray): JsonWriter {
         if(hasValue < depth) {
             hasValue = depth
