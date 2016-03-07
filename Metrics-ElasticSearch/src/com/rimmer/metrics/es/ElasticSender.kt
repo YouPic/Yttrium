@@ -1,12 +1,8 @@
-package com.rimmer.metrics
+package com.rimmer.metrics.es
 
-import com.rimmer.metrics.server.ErrorPacket
-import com.rimmer.metrics.server.Interval
-import com.rimmer.metrics.server.ProfilePacket
-import com.rimmer.metrics.server.StatPacket
+import com.rimmer.metrics.*
 import org.elasticsearch.client.Client
 import org.elasticsearch.common.xcontent.XContentFactory
-import org.joda.time.DateTime
 
 /** A metrics sender implementation for ElasticSearch. */
 class ElasticSender(val search: Client): Sender {
