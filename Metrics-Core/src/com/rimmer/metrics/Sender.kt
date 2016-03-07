@@ -1,11 +1,14 @@
-package com.rimmer.metrics.server
+package com.rimmer.metrics
 
-import com.rimmer.metrics.EventType
 import org.joda.time.DateTime
 
-val statsAggregator = "metrics.aggregator.stat"
-val errorAggregator = "metrics.aggregator.error"
-val profileAggregator = "metrics.aggregator.profile"
+interface Sender {
+    fun sendStatistic(stat: StatPacket)
+    fun sendProfile(profile: ProfilePacket)
+    fun sendError(error: ErrorPacket)
+}
+
+enum class EventType {redis, mysql, mysql_generate, mysql_process, mongo, serialize}
 
 class Interval(val start: Long, val end: Long) {
     val length: Long get() = end - start

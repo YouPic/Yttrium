@@ -1,11 +1,7 @@
-
 package com.rimmer.metrics
 
-import com.rimmer.metrics.server.*
 import org.joda.time.DateTime
 import java.util.*
-
-enum class EventType {redis, mysql, mysql_generate, mysql_process, mongo, serialize}
 
 interface MetricsWriter {
     /**
@@ -16,12 +12,6 @@ interface MetricsWriter {
 
     /** Indicates that the provided event id has finished. */
     fun endEvent(id: Int)
-}
-
-interface Sender {
-    fun sendStatistic(stat: StatPacket)
-    fun sendProfile(profile: ProfilePacket)
-    fun sendError(error: ErrorPacket)
 }
 
 class Metrics: MetricsWriter {

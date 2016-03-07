@@ -1,11 +1,5 @@
 package com.rimmer.metrics
 
-import com.rimmer.metrics.server.ErrorPacket
-import com.rimmer.metrics.server.Interval
-import com.rimmer.metrics.server.ProfilePacket
-import com.rimmer.metrics.server.StatPacket
-import org.joda.time.DateTime
-
 /** A metrics sender that writes to stdout. */
 class ConsoleSender: Sender {
     override fun sendProfile(profile: ProfilePacket) {
