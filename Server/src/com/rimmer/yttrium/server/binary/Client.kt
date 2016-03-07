@@ -11,7 +11,26 @@ import io.netty.channel.ChannelHandlerContext
 import java.util.*
 
 interface BinaryClient {
+    /**
+     * Calls a route and receives its result.
+     * @param route The hash of the route to call
+     * @param path An ordered set of path parameters.
+     * @param queries An ordered set of query parameters.
+     * @param target The expected result type of the route.
+     * @param f Called to receive the result.
+     */
     fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit)
+
+    /**
+     * Calls a route without receiving its result.
+     * @param route The hash of the route to call
+     * @param path An ordered set of path parameters.
+     * @param queries An ordered set of query parameters.
+     * @param target The expected result type of the route (this is needed by the protocol).
+     */
+    fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>)
+
+    /** Closes this connection. Any calls after this will fail. */
     fun close()
 }
 
@@ -28,7 +47,7 @@ fun connectBinary(
 })
 
 class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): BinaryDecoder(), BinaryClient {
-    private data class Request(val target: Class<*>, val handler: (Any?, Throwable?) -> Unit)
+    private data class Request(val target: Class<*>, val handler: ((Any?, Throwable?) -> Unit)?)
 
     private var context: ChannelHandlerContext? = null
     private val requests = ArrayList<Request?>()
@@ -39,20 +58,12 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         onConnect(this, null)
     }
 
+    override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>) {
+        performRequest(Request(target, null), route, path, queries)
+    }
+
     override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit) {
-        writePacket(context!!, addRequest(Request(target, f))) { target, commit ->
-            target.writeVarInt(route)
-
-            for(p in path) {
-                writeBinary(p, target)
-            }
-
-            writeNullMap(queries, target)
-            for(q in queries) {
-                writeBinary(q, target)
-            }
-            commit()
-        }
+        performRequest(Request(target, f), route, path, queries)
     }
 
     override fun close() {
@@ -68,6 +79,22 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
 
         mapResponse(requests[request]!!, packet)
         finishRequest(request)
+    }
+
+    private fun performRequest(r: Request, route: Int, path: Array<Any?>, queries: Array<Any?>) {
+        writePacket(context!!, addRequest(r)) { target, commit ->
+            target.writeVarInt(route)
+
+            for(p in path) {
+                writeBinary(p, target)
+            }
+
+            writeNullMap(queries, target)
+            for(q in queries) {
+                writeBinary(q, target)
+            }
+            commit()
+        }
     }
 
     private fun addRequest(r: Request): Int {
@@ -93,7 +120,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         val response = packet.readByte().toInt()
         if(response == ResponseCode.Success.ordinal) {
             val result = readBinary(packet, request.target)
-            request.handler(result, null)
+            request.handler?.invoke(result, null)
         } else {
             val error = packet.readString()
             val exception = when(response) {
@@ -102,7 +129,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
                 ResponseCode.NotFound.ordinal -> NotFoundException()
                 else -> Exception(error)
             }
-            request.handler(null, exception)
+            request.handler?.invoke(null, exception)
         }
     }
 }
