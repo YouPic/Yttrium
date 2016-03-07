@@ -105,43 +105,45 @@ fun writeBinary(value: Any?, target: ByteBuf) {
  * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String.
  */
 fun readPrimitive(source: String, target: Class<*>): Any {
-    if(target == Int::class.javaObjectType) {
+    if(target == Int::class.javaObjectType || target == Int::class.javaPrimitiveType) {
         return maybeParseInt(source) ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
-    } else if(target == Long::class.javaObjectType) {
+    } else if(target == Long::class.javaObjectType || target == Long::class.javaPrimitiveType) {
         return maybeParseLong(source) ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
     } else if(target == String::class.java) {
         return source
+    } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
+        return Unit
     } else if(target == DateTime::class.java) {
         return DateTime.parse(source)
     } else if(target.isEnum) {
         return (target as Class<Enum<*>>).enumConstants.find {
             it.name == source
         } ?: throw InvalidStateException("\"$source\" is not an instance of enum $target")
-    } else if(target == Boolean::class.javaObjectType) {
+    } else if(target == Boolean::class.javaObjectType || target == Boolean::class.javaPrimitiveType) {
         if(source == "true") return true
         else if(source == "false") return false
         else throw InvalidStateException("\"$source\" is not a boolean")
-    } else if(target == Float::class.javaObjectType) {
+    } else if(target == Float::class.javaObjectType || target == Float::class.javaPrimitiveType) {
         try {
             return java.lang.Float.parseFloat(source)
         } catch(e: Exception) {
             throw InvalidStateException("\"$source\" cannot be parsed as a number")
         }
-    } else if(target == Double::class.javaObjectType) {
+    } else if(target == Double::class.javaObjectType || target == Double::class.javaPrimitiveType) {
         try {
             return java.lang.Double.parseDouble(source)
         } catch(e: Exception) {
             throw InvalidStateException("\"$source\" cannot be parsed as a number")
         }
-    } else if(target == Char::class.javaObjectType) {
+    } else if(target == Char::class.javaObjectType || target == Char::class.javaPrimitiveType) {
         if(source.length == 1) {
             return source[0]
         } else {
             throw InvalidStateException("\"$source\" is not a character")
         }
-    } else if(target == Byte::class.javaObjectType) {
+    } else if(target == Byte::class.javaObjectType || target == Byte::class.javaPrimitiveType) {
         return maybeParseInt(source)?.toByte() ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
-    } else if(target == Short::class.javaObjectType) {
+    } else if(target == Short::class.javaObjectType || target == Short::class.javaPrimitiveType) {
         return maybeParseInt(source)?.toShort() ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
     } else {
         throw IllegalArgumentException("Target type $target is not a primitive type.")
@@ -159,15 +161,19 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
         return readable.fromJson(buffer)
     } else {
         val reader = JsonToken(buffer)
-        if(target == Int::class.java) {
+        if(target == Int::class.javaObjectType || target == Int::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toInt()
-        } else if(target == Long::class.java) {
+        } else if(target == Long::class.javaObjectType || target == Long::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toLong()
         } else if(target == String::class.java) {
             reader.expect(JsonToken.Type.StringLit)
             return reader.stringPayload
+        } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
+            reader.expect(JsonToken.Type.StartObject)
+            reader.expect(JsonToken.Type.EndObject)
+            return Unit
         } else if(target == DateTime::class.java) {
             reader.parse()
             if(reader.type == JsonToken.Type.NumberLit) {
@@ -182,28 +188,24 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
             return (target as Class<Enum<*>>).enumConstants.find {
                 it.name == reader.stringPayload
             } ?: throw InvalidStateException("Expected instance of enum $target")
-        } else if(target == Boolean::class.java) {
+        } else if(target == Boolean::class.javaObjectType || target == Boolean::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.BoolLit)
             return reader.boolPayload
-        } else if(target == Float::class.java) {
+        } else if(target == Float::class.javaObjectType || target == Float::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toFloat()
-        } else if(target == Double::class.java) {
+        } else if(target == Double::class.javaObjectType || target == Double::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload
-        } else if(target == Char::class.java) {
+        } else if(target == Char::class.javaObjectType || target == Char::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.StringLit)
             return reader.stringPayload.firstOrNull() ?: ' '
-        } else if(target == Byte::class.java) {
+        } else if(target == Byte::class.javaObjectType || target == Byte::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toByte()
-        } else if(target == Short::class.java) {
+        } else if(target == Short::class.javaObjectType || target == Short::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toShort()
-        } else if(target == Unit::class.javaObjectType) {
-            reader.expect(JsonToken.Type.StartObject)
-            reader.expect(JsonToken.Type.EndObject)
-            return Unit
         } else {
             throw InvalidStateException("Value cannot be parsed into $target.")
         }
@@ -220,13 +222,15 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
     if(readable != null) {
         return readable.fromBinary(buffer)
     } else {
-        if(target == Int::class.java) {
+        if(target == Int::class.javaObjectType || target == Int::class.javaPrimitiveType) {
             return buffer.readVarInt()
-        } else if(target == Long::class.java) {
+        } else if(target == Long::class.javaObjectType || target == Long::class.javaPrimitiveType) {
             return buffer.readVarLong()
-        } else if(target == String::class.java) {
+        } else if(target == String::class.javaObjectType) {
             return buffer.readString()
-        } else if(target == DateTime::class.java) {
+        } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
+            return Unit
+        } else if(target == DateTime::class.javaObjectType) {
             return DateTime(buffer.readVarLong())
         } else if(target.isEnum) {
             val index = buffer.readVarInt()
@@ -235,20 +239,18 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
                 throw InvalidStateException("Expected instance of enum $target")
             }
             return values[index]
-        } else if(target == Boolean::class.java) {
+        } else if(target == Boolean::class.javaObjectType || target == Boolean::class.javaPrimitiveType) {
             return if(buffer.readVarInt() == 0) false else true
-        } else if(target == Float::class.java) {
+        } else if(target == Float::class.javaObjectType || target == Float::class.javaPrimitiveType) {
             return buffer.readFloat()
-        } else if(target == Double::class.java) {
+        } else if(target == Double::class.javaObjectType || target == Double::class.javaPrimitiveType) {
             return buffer.readDouble()
-        } else if(target == Char::class.java) {
+        } else if(target == Char::class.javaObjectType || target == Char::class.javaPrimitiveType) {
             return buffer.readString().firstOrNull() ?: ' '
-        } else if(target == Byte::class.java) {
+        } else if(target == Byte::class.javaObjectType || target == Byte::class.javaPrimitiveType) {
             return buffer.readVarInt().toByte()
-        } else if(target == Short::class.java) {
+        } else if(target == Short::class.javaObjectType || target == Short::class.javaPrimitiveType) {
             return buffer.readVarInt().toShort()
-        } else if(target == Unit::class.javaObjectType) {
-            return Unit
         } else {
             throw InvalidStateException("Value cannot be parsed into $target.")
         }
