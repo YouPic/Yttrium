@@ -78,43 +78,44 @@ class Router(val plugins: List<Plugin<in Any>>) {
             p.plugin.modifySwagger(p.context, swaggerRoute)
         }
 
-        // Returns the next handler argument that has no provider yet.
-        var argIndex = -1
-        val nextArg = {
-            argIndex++
-            while(providers[argIndex]) {
-                argIndex++
-                if(argIndex >= providers.size) {
-                    throw IllegalArgumentException("The handler for this route has less arguments than there are in the route")
-                }
-            }
-
-            argIndex
+        // Create a list of path parameter -> handler parameter bindings.
+        // Only use the original segments here - any segments added by plugins should be handled by those.
+        val typedSegments = funSegments.filter { it.type != null }.toTypedArray()
+        if(providers.size < typedSegments.size) {
+            throw IllegalArgumentException("Each path parameter must have a corresponding function argument.")
         }
 
-        // Create a list of path parameter -> handler parameter bindings.
-        val typedSegments = segments.filter { it.type != null }.toTypedArray()
         val pathBindings = ArrayList<Int>()
-        for(s in typedSegments) {
-            pathBindings.add(nextArg())
+        typedSegments.forEachIndexed { i, segment ->
+            if(providers[i]) {
+                throw IllegalArgumentException("Defined path parameter ${segment.name} cannot be provided a plugin.")
+            }
+
+            pathBindings.add(i)
             swaggerRoute.parameters.add(
-                Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
+                Swagger.Parameter(segment.name, Swagger.ParameterType.Path, "", types[i], false)
             )
         }
 
         // Create a list of query parameter -> handler parameter bindings.
+        // Arguments that are already provided by a plugin are presumed to be used by that plugin.
+        val firstQuery = typedSegments.size
         val queryBindings = ArrayList<Int>()
-        for(q in funQueries) {
-            queryBindings.add(nextArg())
-            queries.add(RouteQuery(q.name, q.name.hashCode(), types[argIndex], q.optional, q.default, q.description))
-            swaggerRoute.parameters.add(
-                Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
-            )
+        funQueries.forEachIndexed { i, q ->
+            val index = firstQuery + i
+            if(!providers[index]) {
+                queryBindings.add(index)
+                queries.add(RouteQuery(q.name, q.name.hashCode(), types[index], q.optional, q.default, q.description))
+                swaggerRoute.parameters.add(
+                    Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[index], q.default != null)
+                )
+            }
         }
 
         // Create the route handler.
         val name = "$method ${swaggerRoute.info.path}"
-        val route = Route(name, method, version, segments.toTypedArray(), typedSegments, queries.toTypedArray())
+        val inputSegments = segments.filter { it.type != null }.toTypedArray()
+        val route = Route(name, method, version, segments.toTypedArray(), inputSegments, queries.toTypedArray())
 
         route.handler = routeHandler(
             route,
