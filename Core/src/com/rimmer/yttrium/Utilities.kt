@@ -38,3 +38,24 @@ fun maybeParseInt(text: String): Int? {
 
 /** Tries to parse an Int from a string. Returns the provided default on failure. */
 fun parseInt(text: String, otherwise: Int = 0) = maybeParseInt(text) ?: otherwise
+
+/** Iterates over the data structure, but calls a different function for the last element. */
+inline fun <E> Iterable<E>.iterateLast(element: (E) -> Unit, last: (E) -> Unit) {
+    val i = iterator()
+    if(i.hasNext()) {
+        while(true) {
+            val e = i.next()
+            if(i.hasNext()) {
+                element(e)
+            } else {
+                last(e)
+                break
+            }
+        }
+    }
+}
+
+/** Writes elements to a string separated by sep. */
+inline fun <E> Iterable<E>.sepBy(string: StringBuilder, sep: String, f: (E) -> Unit) {
+    iterateLast({f(it); string.append(sep)}, {f(it)})
+}
