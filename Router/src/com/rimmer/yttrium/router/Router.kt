@@ -25,7 +25,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         funQueries: Iterable<BuilderQuery>,
         types: Array<Class<*>>,
         result: Class<*>,
-        call: RouteContext.(Array<Any?>) -> Future<in Any>
+        call: RouteContext.(Array<Any?>) -> Future<*>
     ) {
         val segments = funSegments.toMutableList()
         val queries = ArrayList<RouteQuery>()
@@ -68,8 +68,8 @@ class Router(val plugins: List<Plugin<in Any>>) {
 
         // Create the swagger route.
         val swaggerRoute = Swagger.Route(
-                Swagger.PathInfo(buildSwaggerPath(segments), buildEquivalencePath(segments), currentCategory.name),
-                method, version
+            Swagger.PathInfo(buildSwaggerPath(segments), buildEquivalencePath(segments), currentCategory.name),
+            method, version
         )
         swagger.addRoute(swaggerRoute, currentCategory)
 
@@ -98,7 +98,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         for(s in typedSegments) {
             pathBindings.add(nextArg())
             swaggerRoute.parameters.add(
-                    Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
+                Swagger.Parameter(s.name, Swagger.ParameterType.Path, "", types[argIndex], false)
             )
         }
 
@@ -108,7 +108,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
             queryBindings.add(nextArg())
             queries.add(RouteQuery(q.name, q.name.hashCode(), types[argIndex], q.optional, q.default, q.description))
             swaggerRoute.parameters.add(
-                    Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
+                Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[argIndex], q.default != null)
             )
         }
 
@@ -127,7 +127,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         routes.add(route)
     }
 
-    fun addRoute(desc: RouteBuilder, call: RouteContext.(Array<Any?>) -> Future<in Any>, types: Array<Class<*>>, result: Class<*>) {
+    fun addRoute(desc: RouteBuilder, call: RouteContext.(Array<Any?>) -> Future<*>, types: Array<Class<*>>, result: Class<*>) {
         addRoute(desc.method, desc.version, desc.properties, buildSegments(desc.path, types), desc.queries, types, result, call)
     }
 

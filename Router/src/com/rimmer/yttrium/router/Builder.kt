@@ -29,22 +29,30 @@ class RouteBuilder(val router: Router, val method: HttpMethod, val path: String,
      */
 
     inline infix fun <reified R: Any> handle(crossinline f: RouteContext.() -> Future<R>) {
-        router.addRoute(this, {f() as Future<Any>}, emptyArray(), R::class.java)
+        router.addRoute(this, {f()}, emptyArray(), R::class.java)
     }
 
     inline infix fun <reified R: Any, reified A: Any> handle(crossinline f: RouteContext.(A) -> Future<R>) {
-        router.addRoute(this, {f(it[0] as A) as Future<Any>}, arrayOf(A::class.java), R::class.java)
+        router.addRoute(this, {f(it[0] as A)}, arrayOf(A::class.java), R::class.java)
     }
 
     inline infix fun <reified R: Any, reified A: Any, reified B: Any> handle(crossinline f: RouteContext.(A, B) -> Future<R>) {
-        router.addRoute(this, {f(it[0] as A, it[1] as B) as Future<Any>}, arrayOf(A::class.java, B::class.java), R::class.java)
+        router.addRoute(this, {f(it[0] as A, it[1] as B)}, arrayOf(A::class.java, B::class.java), R::class.java)
     }
 
     inline infix fun <reified R: Any, reified A: Any, reified B: Any, reified C: Any> handle(crossinline f: RouteContext.(A, B, C) -> Future<R>) {
-        router.addRoute(this, {f(it[0] as A, it[1] as B, it[2] as C) as Future<Any>}, arrayOf(A::class.java, B::class.java, C::class.java), R::class.java)
+        router.addRoute(this, {f(it[0] as A, it[1] as B, it[2] as C)}, arrayOf(A::class.java, B::class.java, C::class.java), R::class.java)
     }
 
     inline infix fun <reified R: Any, reified A: Any, reified B: Any, reified C: Any, reified D: Any> handle(crossinline f: RouteContext.(A, B, C, D) -> Future<R>) {
-        router.addRoute(this, {f(it[0] as A, it[1] as B, it[2] as C, it[3] as D) as Future<Any>}, arrayOf(A::class.java, B::class.java, C::class.java, D::class.java), R::class.java)
+        router.addRoute(this, {f(it[0] as A, it[1] as B, it[2] as C, it[3] as D)}, arrayOf(A::class.java, B::class.java, C::class.java, D::class.java), R::class.java)
+    }
+
+    inline infix fun <reified R: Any, reified A: Any, reified B: Any, reified C: Any, reified D: Any, reified E: Any> handle(crossinline f: RouteContext.(A, B, C, D, E) -> Future<R>) {
+        router.addRoute(this, {f(it[0] as A, it[1] as B, it[2] as C, it[3] as D, it[4] as E)}, arrayOf(A::class.java, B::class.java, C::class.java, D::class.java, E::class.java), R::class.java)
+    }
+
+    inline infix fun <reified R: Any, reified A: Any, reified B: Any, reified C: Any, reified D: Any, reified E: Any, reified F: Any> handle(crossinline f: RouteContext.(A, B, C, D, E, F) -> Future<R>) {
+        router.addRoute(this, {f(it[0] as A, it[1] as B, it[2] as C, it[3] as D, it[4] as E, it[5] as F)}, arrayOf(A::class.java, B::class.java, C::class.java, D::class.java, E::class.java, F::class.java), R::class.java)
     }
 }

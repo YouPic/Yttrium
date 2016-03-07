@@ -6,7 +6,7 @@ fun routeHandler(
     pathBindings: IntArray,
     queryBindings: IntArray,
     argumentCount: Int,
-    call: RouteContext.(Array<Any?>) -> Future<in Any>
+    call: RouteContext.(Array<Any?>) -> Future<*>
 ) = { context: RouteContext, listener: RouteListener ->
     val listenerId = listener.onStart(route)
 
