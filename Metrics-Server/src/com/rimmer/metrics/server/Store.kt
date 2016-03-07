@@ -1,5 +1,6 @@
 package com.rimmer.metrics.server
 
+import com.rimmer.metrics.*
 import org.joda.time.DateTime
 import java.util.*
 
@@ -93,7 +94,7 @@ class MetricStore {
     }
 
     @Synchronized fun onError(packet: ErrorPacket) {
-        val classes = errorMap.getOrPut(packet.path) {HashMap<String, ErrorClass>()}
+        val classes = errorMap.getOrPut(packet.path) { HashMap<String, ErrorClass>() }
         val type = classes.getOrPut(packet.cause) {ErrorClass(packet.cause, packet.trace)}
         type.count++
         type.lastOccurrence = packet.time
