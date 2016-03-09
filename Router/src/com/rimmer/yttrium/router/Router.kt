@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.router
 
+import com.rimmer.yttrium.Task
 import com.rimmer.yttrium.router.plugin.Plugin
 import java.util.*
 
@@ -25,7 +26,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         funQueries: Iterable<BuilderQuery>,
         types: Array<Class<*>>,
         result: Class<*>,
-        call: RouteContext.(Array<Any?>) -> Future<*>
+        call: RouteContext.(Array<Any?>) -> Task<*>
     ) {
         val segments = funSegments.toMutableList()
         val queries = ArrayList<RouteQuery>()
@@ -134,7 +135,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         routes.add(route)
     }
 
-    fun addRoute(desc: RouteBuilder, call: RouteContext.(Array<Any?>) -> Future<*>, types: Array<Class<*>>, result: Class<*>) {
+    fun addRoute(desc: RouteBuilder, call: RouteContext.(Array<Any?>) -> Task<*>, types: Array<Class<*>>, result: Class<*>) {
         addRoute(desc.method, desc.version, desc.properties, buildSegments(desc.path, types), desc.queries, types, result, call)
     }
 

@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.router
 
+import com.rimmer.yttrium.Task
 import io.netty.channel.ChannelHandlerContext
 
 /** The supported http call methods. */
@@ -123,24 +124,9 @@ class RouteContext(
     val pathParameters: Array<Any?>,
     val queryParameters: Array<Any?>
 ) {
-    fun <T> succeed(v: T) = Future<T>().succeed(v)
-    fun succeed() = Future<Unit>().succeed(Unit)
+    fun <T> finish(v: T) = Task<T>().finish(v)
+    fun finish() = Task<Unit>().finish(Unit)
 
-    fun fail(cause: Throwable?) {}
+    fun <T> fail(cause: Throwable) = Task<T>().fail(cause)
 }
 
-class Future<T> {
-    fun succeed(v: T): Future<T> {
-        then?.invoke(v)
-        result = v
-        return this
-    }
-
-    fun then(f: (T) -> Unit) {
-        then = f
-        result?.let {f(it)}
-    }
-
-    private var then: ((T) -> Unit)? = null
-    private var result: T? = null
-}

@@ -1,12 +1,14 @@
 package com.rimmer.yttrium.router
 
+import com.rimmer.yttrium.Task
+
 fun routeHandler(
     route: Route,
     plugins: List<RoutePlugin>,
     pathBindings: IntArray,
     queryBindings: IntArray,
     argumentCount: Int,
-    call: RouteContext.(Array<Any?>) -> Future<*>
+    call: RouteContext.(Array<Any?>) -> Task<*>
 ) = { context: RouteContext, listener: RouteListener ->
     val listenerId = listener.onStart(route)
 
@@ -48,7 +50,11 @@ fun routeHandler(
                     modifyCall(plugin, args)
                 }
             } else {
-                context.call(args).then { modifyResult(plugins.iterator(), it) }
+                context.call(args).onFinish {
+                    modifyResult(plugins.iterator(), it)
+                }.onFail {
+                    listener.onFail(listenerId, route, it)
+                }
             }
         }
 
