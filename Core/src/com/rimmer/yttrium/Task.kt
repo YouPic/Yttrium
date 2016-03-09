@@ -6,6 +6,18 @@ inline fun <T> task(f: Task<T>.() -> Unit): Task<T> {
     return t
 }
 
+fun <T> finished(v: T): Task<T> {
+    val task = Task<T>()
+    task.finish(v)
+    return task
+}
+
+fun <T> failed(reason: Throwable): Task<T> {
+    val task = Task<T>()
+    task.fail(reason)
+    return task
+}
+
 /** Represents a task that will be performed asynchronously and will either provide a result or fail. */
 class Task<T> {
     /**
@@ -47,26 +59,32 @@ class Task<T> {
     }
 
     /** Maps the task through the provided function, returning a new task. */
-    inline fun <U> map(crossinline f: (T) -> U): Task<U> {
+    inline fun <U> map(crossinline f: (T) -> U) = mapMaybe {f(it!!)}
+
+    /** Maps the task through the provided function, returning a new task. */
+    inline fun <U> mapMaybe(crossinline f: (T?) -> U): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
-            if(r != null) {
+            if(e == null) {
                 task.finish(f(r))
             } else {
-                task.fail(e!!)
+                task.fail(e)
             }
         }
         return task
     }
 
     /** Maps the task through the provided functions, returning a new task. */
-    inline fun <U> map(crossinline succeed: (T) -> U, crossinline fail: (Throwable) -> U): Task<U> {
+    inline fun <U> map(crossinline succeed: (T) -> U, crossinline fail: (Throwable) -> U) = mapMaybe({succeed(it!!)}, fail)
+
+    /** Maps the task through the provided functions, returning a new task. */
+    inline fun <U> mapMaybe(crossinline succeed: (T?) -> U, crossinline fail: (Throwable) -> U): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
-            if(r != null) {
+            if(e == null) {
                 task.finish(succeed(r))
             } else {
-                task.finish(fail(e!!))
+                task.finish(fail(e))
             }
         }
         return task
@@ -76,45 +94,51 @@ class Task<T> {
     inline fun catch(crossinline f: (Throwable) -> T) = map({it}, {f(it)})
 
     /** Runs the provided task generator on finish, returning the new task. */
-    inline fun <U> then(crossinline f: (T) -> Task<U>): Task<U> {
+    inline fun <U> then(crossinline f: (T) -> Task<U>) = thenMaybe {f(it!!)}
+
+    /** Runs the provided task generator on finish, returning the new task. */
+    inline fun <U> thenMaybe(crossinline f: (T?) -> Task<U>): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
-            if(r != null) {
+            if(e == null) {
                 val next = f(r)
                 next.handler = {r, e ->
-                    if(r != null) {
-                        task.finish(r)
+                    if(e == null) {
+                        task.finish(r!!)
                     } else {
-                        task.fail(e!!)
+                        task.fail(e)
                     }
                 }
             } else {
-                task.fail(e!!)
+                task.fail(e)
             }
         }
         return task
     }
 
     /** Runs the provided task generator on finish or failure, returning the new task. */
-    inline fun <U> then(crossinline succeed: (T) -> Task<U>, crossinline fail: (Throwable) -> Task<U>): Task<U> {
+    inline fun <U> then(crossinline succeed: (T) -> Task<U>, crossinline fail: (Throwable) -> Task<U>) = thenMaybe({succeed(it!!)}, fail)
+
+    /** Runs the provided task generator on finish or failure, returning the new task. */
+    inline fun <U> thenMaybe(crossinline succeed: (T?) -> Task<U>, crossinline fail: (Throwable) -> Task<U>): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
-            if(r != null) {
+            if(e == null) {
                 val next = succeed(r)
                 next.handler = {r, e ->
-                    if(r != null) {
-                        task.finish(r)
+                    if(e == null) {
+                        task.finish(r!!)
                     } else {
-                        task.fail(e!!)
+                        task.fail(e)
                     }
                 }
             } else {
-                val next = fail(e!!)
+                val next = fail(e)
                 next.handler = {r, e ->
-                    if(r != null) {
-                        task.finish(r)
+                    if(e == null) {
+                        task.finish(r!!)
                     } else {
-                        task.fail(e!!)
+                        task.fail(e)
                     }
                 }
             }
