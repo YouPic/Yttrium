@@ -66,7 +66,11 @@ class Task<T> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
-                task.finish(f(r))
+                try {
+                    task.finish(f(r!!))
+                } catch(e: Throwable) {
+                    task.fail(e)
+                }
             } else {
                 task.fail(e)
             }
@@ -82,9 +86,17 @@ class Task<T> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
-                task.finish(succeed(r))
+                try {
+                    task.finish(succeed(r!!))
+                } catch(e: Throwable) {
+                    task.fail(e)
+                }
             } else {
-                task.finish(fail(e))
+                try {
+                    task.finish(fail(e))
+                } catch(e: Throwable) {
+                    task.fail(e)
+                }
             }
         }
         return task
@@ -101,13 +113,17 @@ class Task<T> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
-                val next = f(r)
-                next.handler = {r, e ->
-                    if(e == null) {
-                        task.finish(r!!)
-                    } else {
-                        task.fail(e)
+                try {
+                    val next = f(r)
+                    next.handler = {r, e ->
+                        if(e == null) {
+                            task.finish(r!!)
+                        } else {
+                            task.fail(e)
+                        }
                     }
+                } catch(e: Throwable) {
+                    task.fail(e)
                 }
             } else {
                 task.fail(e)
@@ -124,22 +140,30 @@ class Task<T> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
-                val next = succeed(r)
-                next.handler = {r, e ->
-                    if(e == null) {
-                        task.finish(r!!)
-                    } else {
-                        task.fail(e)
+                try {
+                    val next = succeed(r)
+                    next.handler = {r, e ->
+                        if(e == null) {
+                            task.finish(r!!)
+                        } else {
+                            task.fail(e)
+                        }
                     }
+                } catch(e: Throwable) {
+                    task.fail(e)
                 }
             } else {
-                val next = fail(e)
-                next.handler = {r, e ->
-                    if(e == null) {
-                        task.finish(r!!)
-                    } else {
-                        task.fail(e)
+                try {
+                    val next = fail(e)
+                    next.handler = { r, e ->
+                        if (e == null) {
+                            task.finish(r!!)
+                        } else {
+                            task.fail(e)
+                        }
                     }
+                } catch(e: Throwable) {
+                    task.fail(e)
                 }
             }
         }
