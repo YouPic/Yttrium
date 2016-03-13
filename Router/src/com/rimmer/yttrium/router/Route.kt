@@ -2,6 +2,7 @@ package com.rimmer.yttrium.router
 
 import com.rimmer.yttrium.Task
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.EventLoop
 
 /** The supported http call methods. */
 enum class HttpMethod {GET, POST, DELETE, PUT}
@@ -119,8 +120,18 @@ interface RouteListener {
     fun onFail(id: Long, route: Route, reason: Throwable?)
 }
 
+/**
+ * Context information that is sent to route handlers.
+ * @param channel The channel this route is being executed for.
+ * @param eventLoop The current event loop.
+ * @param route The route being executed.
+ * @param pathParameters The path parameters that were sent to the route.
+ * @param queryParameters The query parameters that were sent to the route.
+ */
 class RouteContext(
     val channel: ChannelHandlerContext,
+    val eventLoop: EventLoop,
+    val route: Route,
     val pathParameters: Array<Any?>,
     val queryParameters: Array<Any?>
 ) {
@@ -129,4 +140,3 @@ class RouteContext(
 
     fun <T> fail(cause: Throwable) = Task<T>().fail(cause)
 }
-

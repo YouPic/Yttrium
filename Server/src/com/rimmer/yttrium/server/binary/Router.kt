@@ -56,7 +56,7 @@ class BinaryRouter(
                 }
             }
 
-            route.handler(RouteContext(context, params, queries), object: RouteListener {
+            val listener = object: RouteListener {
                 override fun onStart(route: Route) = 0L
                 override fun onSucceed(id: Long, route: Route, result: Any?) {
                     val writerIndex = target.writerIndex()
@@ -73,7 +73,9 @@ class BinaryRouter(
                 override fun onFail(id: Long, route: Route, reason: Throwable?) {
                     mapError(reason, target, f)
                 }
-            })
+            }
+
+            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries), listener)
         } catch(e: Throwable) {
             mapError(e, target, f)
         }

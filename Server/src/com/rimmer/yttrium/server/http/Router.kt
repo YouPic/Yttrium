@@ -57,7 +57,8 @@ class HttpRouter(
             // TODO: Parse request body here if needed.
 
             checkQueries(route, queries)
-            route.handler(RouteContext(context, params, queries), object: RouteListener {
+
+            val listener = object: RouteListener {
                 override fun onStart(route: Route) = 0L
                 override fun onSucceed(id: Long, route: Route, result: Any?) {
                     val buffer = context.alloc().buffer()
@@ -70,7 +71,9 @@ class HttpRouter(
                     } catch(e: Throwable) { fail(e) }
                 }
                 override fun onFail(id: Long, route: Route, reason: Throwable?) { fail(reason) }
-            })
+            }
+
+            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries), listener)
         } catch(e: Throwable) { fail(e) }
     }
 }
