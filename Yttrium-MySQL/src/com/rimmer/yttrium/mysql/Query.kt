@@ -62,10 +62,10 @@ inline fun <T> Query.valueOrElse(pool: ConnectionPool, crossinline format: (Row)
 }
 
 /** Makes sure that the query contains at least one result and returns the single column. */
-inline fun <reified T> Query.value(pool: ConnectionPool) = value(pool) { it[0] as T }
+fun <T> Query.value(pool: ConnectionPool) = value(pool) { it[0] as T }
 
 /** Fetches one result if possible, and returns the single column. */
-inline fun <reified T> Query.maybeValue(pool: ConnectionPool) = maybeValue(pool) { it[0] as T }
+fun <T> Query.maybeValue(pool: ConnectionPool) = maybeValue(pool) { it[0] as T }
 
 /** Fetches one result if possible and returns the single column. Otherwise, the provided task is run. */
 inline fun <reified T> Query.valueOrElse(pool: ConnectionPool, crossinline otherwise: () -> Task<T>) = valueOrElse(pool, { it[0] as T }, otherwise)
@@ -78,7 +78,7 @@ inline fun <T> Query.values(pool: ConnectionPool, crossinline format: (Row) -> T
 }
 
 /** Fetches a list of results and formats each entry. */
-inline fun <reified T> Query.values(pool: ConnectionPool) = values(pool) {it[0] as T}
+fun <T> Query.values(pool: ConnectionPool) = values(pool) {it[0] as T}
 
 /** Creates an associative map from a result query. */
 inline fun <K, V> Query.asMap(pool: ConnectionPool, crossinline key: (Row) -> K, crossinline value: (Row) -> V) = map(pool) {
@@ -90,7 +90,7 @@ inline fun <K, V> Query.asMap(pool: ConnectionPool, crossinline key: (Row) -> K,
 }
 
 /** Performs an action if the query succeeded. */
-fun <T> Query.map(pool: ConnectionPool, f: (QueryResult) -> T): Task<T> {
+inline fun <T> Query.map(pool: ConnectionPool, crossinline f: (QueryResult) -> T): Task<T> {
     val task = Task<T>()
     run(pool) {r, e ->
         if(e == null) {
@@ -107,7 +107,7 @@ fun <T> Query.map(pool: ConnectionPool, f: (QueryResult) -> T): Task<T> {
 }
 
 /** Performs a task if the query succeeded. */
-fun <T> Query.then(pool: ConnectionPool, f: (QueryResult) -> Task<T>): Task<T> {
+inline fun <T> Query.then(pool: ConnectionPool, crossinline f: (QueryResult) -> Task<T>): Task<T> {
     val task = Task<T>()
     run(pool) {r, e ->
         if(e == null) {
