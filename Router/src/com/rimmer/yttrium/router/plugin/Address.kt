@@ -17,9 +17,9 @@ class AddressPlugin: Plugin<Int> {
         return route.provideIfExists(IPAddress::class.java)
     }
 
-    override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: () -> Unit) {
+    override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {
         val ip = (route.channel.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
         arguments[context] = IPAddress(ip)
-        f()
+        f(null)
     }
 }

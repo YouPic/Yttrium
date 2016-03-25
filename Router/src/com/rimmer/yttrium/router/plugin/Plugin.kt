@@ -30,11 +30,11 @@ interface Plugin<Context> {
      * @param arguments A list of arguments with the same order as in isUsed.
      * The plugin should set any arguments it indicated itself as a provider for.
      */
-    fun modifyCall(context: Context, route: RouteContext, arguments: Array<Any?>, f: () -> Unit) = f()
+    fun modifyCall(context: Context, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) = f(null)
 
     /**
      * Modifies the result returned by the route handler if needed.
      * When done, call the provided callback to continue the route request.
      */
-    fun modifyResult(context: Context, route: RouteContext, result: Any?, f: (Any?) -> Unit) = f(result)
+    fun modifyResult(context: Context, route: RouteContext, result: Any?, f: (Any?, Throwable?) -> Unit) = f(result, null)
 }

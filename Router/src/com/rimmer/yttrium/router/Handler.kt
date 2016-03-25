@@ -33,8 +33,12 @@ fun routeHandler(
         fun modifyResult(plugin: Iterator<RoutePlugin>, result: Any?) {
             if (plugin.hasNext()) {
                 val p = plugin.next()
-                p.plugin.modifyResult(p.context, context, result) {
-                    modifyResult(plugin, it)
+                p.plugin.modifyResult(p.context, context, result) { r, e ->
+                    if(e == null) {
+                        modifyResult(plugin, r!!)
+                    } else {
+                        listener.onFail(listenerId, route, e)
+                    }
                 }
             } else {
                 listener.onSucceed(listenerId, route, result)
@@ -46,8 +50,12 @@ fun routeHandler(
         fun modifyCall(plugin: Iterator<RoutePlugin>, args: Array<Any?>) {
             if (plugin.hasNext()) {
                 val p = plugin.next()
-                p.plugin.modifyCall(p.context, context, args) {
-                    modifyCall(plugin, args)
+                p.plugin.modifyCall(p.context, context, args) { e ->
+                    if(e == null) {
+                        modifyCall(plugin, args)
+                    } else {
+                        listener.onFail(listenerId, route, e)
+                    }
                 }
             } else {
                 context.call(args).onFinish {
