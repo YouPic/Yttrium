@@ -73,7 +73,7 @@ class HttpRouter(
                 override fun onFail(id: Long, route: Route, reason: Throwable?) { fail(reason) }
             }
 
-            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries), listener)
+            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
         } catch(e: Throwable) { fail(e) }
     }
 }

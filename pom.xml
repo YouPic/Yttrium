@@ -25,7 +25,7 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
-            <version>4.1.0.CR3</version>
+            <version>4.1.0.CR4</version>
         </dependency>
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>

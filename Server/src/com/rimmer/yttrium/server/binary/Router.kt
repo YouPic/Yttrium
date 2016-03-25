@@ -75,7 +75,7 @@ class BinaryRouter(
                 }
             }
 
-            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries), listener)
+            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
         } catch(e: Throwable) {
             mapError(e, target, f)
         }

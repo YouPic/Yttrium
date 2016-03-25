@@ -127,13 +127,15 @@ interface RouteListener {
  * @param route The route being executed.
  * @param pathParameters The path parameters that were sent to the route.
  * @param queryParameters The query parameters that were sent to the route.
+ * @param id The metrics/call id for the current route.
  */
 class RouteContext(
     val channel: ChannelHandlerContext,
     val eventLoop: EventLoop,
     val route: Route,
     val pathParameters: Array<Any?>,
-    val queryParameters: Array<Any?>
+    val queryParameters: Array<Any?>,
+    val id: Long
 ) {
     fun <T> finish(v: T) = Task<T>().finish(v)
     fun finish() = Task<Unit>().finish(Unit)
