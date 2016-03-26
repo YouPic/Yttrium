@@ -60,9 +60,9 @@ fun routeHandler(
             } else {
                 context.call(args).handler = { r: Any?, e: Throwable? ->
                     if(e == null) {
-                        listener.onFail(listenerId, route, e)
-                    } else {
                         modifyResult(plugins.iterator(), r)
+                    } else {
+                        listener.onFail(listenerId, route, e)
                     }
                 }
             }
