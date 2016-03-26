@@ -67,7 +67,7 @@ class Task<T> {
         handler = {r, e ->
             if(e == null) {
                 try {
-                    task.finish(f(r!!))
+                    task.finish(f(r))
                 } catch(e: Throwable) {
                     task.fail(e)
                 }
@@ -87,7 +87,7 @@ class Task<T> {
         handler = {r, e ->
             if(e == null) {
                 try {
-                    task.finish(succeed(r!!))
+                    task.finish(succeed(r))
                 } catch(e: Throwable) {
                     task.fail(e)
                 }
