@@ -1,5 +1,7 @@
 package com.rimmer.yttrium
 
+enum class TaskState {waiting, finished, error}
+
 inline fun <T> task(f: Task<T>.() -> Unit): Task<T> {
     val t = Task<T>()
     t.f()
@@ -25,8 +27,13 @@ class Task<T> {
      * @return This task.
      */
     fun finish(v: T): Task<T> {
-        cachedResult = v
-        handler?.invoke(v, null)
+        if(state == TaskState.waiting) {
+            state = TaskState.finished
+            cachedResult = v
+            handler?.invoke(v, null)
+        } else {
+            throw IllegalStateException("This task already has a result")
+        }
         return this
     }
 
@@ -35,8 +42,13 @@ class Task<T> {
      * @return This task.
      */
     fun fail(reason: Throwable): Task<T> {
-        cachedError = reason
-        handler?.invoke(null, reason)
+        if(state == TaskState.waiting) {
+            state = TaskState.error
+            cachedError = reason
+            handler?.invoke(null, reason)
+        } else {
+            throw IllegalStateException("This task already has a result")
+        }
         return this
     }
 
@@ -180,11 +192,12 @@ class Task<T> {
     var handler: ((T?, Throwable?) -> Unit)? = null
         set(v) {
             field = v
-            if(result != null || error != null) {
+            if(state != TaskState.waiting) {
                 v?.invoke(result, error)
             }
         }
 
     private var cachedResult: T? = null
     private var cachedError: Throwable? = null
+    private var state = TaskState.waiting
 }
