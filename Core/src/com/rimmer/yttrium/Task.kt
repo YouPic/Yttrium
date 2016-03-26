@@ -25,8 +25,8 @@ class Task<T> {
      * @return This task.
      */
     fun finish(v: T): Task<T> {
-        handler?.invoke(v, null)
         cachedResult = v
+        handler?.invoke(v, null)
         return this
     }
 
@@ -35,8 +35,8 @@ class Task<T> {
      * @return This task.
      */
     fun fail(reason: Throwable): Task<T> {
-        handler?.invoke(null, reason)
         cachedError = reason
+        handler?.invoke(null, reason)
         return this
     }
 
