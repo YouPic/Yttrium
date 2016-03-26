@@ -68,10 +68,12 @@ class BinaryRouter(
                     } catch(e: Throwable) {
                         target.writerIndex(writerIndex)
                         mapError(e, target, f)
+                        listener?.onFail(id, route, e)
                     }
                 }
                 override fun onFail(id: Long, route: Route, reason: Throwable?) {
                     mapError(reason, target, f)
+                    listener?.onFail(id, route, reason)
                 }
             }
 
