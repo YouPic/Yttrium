@@ -17,15 +17,17 @@ class ServerContext(val acceptorGroup: EventLoopGroup, val handlerGroup: EventLo
 /**
  * Runs a server by creating a server context and sending it to the provided starter callback.
  * This function only returns when the server shuts down.
+ * @param threadCount The number of threads to use. If 0, one thread is created for each cpu.
+ * @param useNative Use native transport instead of NIO if possible (Linux only).
  */
-inline fun runServer(f: (ServerContext) -> Unit) {
+inline fun runServer(threadCount: Int = 0, useNative: Boolean = false, f: (ServerContext) -> Unit) {
     // Create the server thread pools to use for every module.
     // Use native Epoll if possible, since it gives much better performance for small packets.
-    val handlerThreads = Runtime.getRuntime().availableProcessors()
+    val handlerThreads = if(threadCount == 0) Runtime.getRuntime().availableProcessors() else threadCount
     var acceptorGroup: EventLoopGroup
     var handlerGroup: EventLoopGroup
 
-    if(Epoll.isAvailable()) {
+    if(Epoll.isAvailable() && useNative) {
         acceptorGroup = EpollEventLoopGroup(1)
         handlerGroup = EpollEventLoopGroup(handlerThreads)
     } else {
