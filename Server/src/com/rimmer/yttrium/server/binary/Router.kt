@@ -80,6 +80,7 @@ class BinaryRouter(
             route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
         } catch(e: Throwable) {
             mapError(e, target, f)
+            listener?.onFail(callId, route, e)
         }
     }
 
