@@ -33,54 +33,65 @@ class BinaryRouter(
         }
 
         val callId = listener?.onStart(route) ?: 0
-        try {
-            val params = arrayOfNulls<Any>(route.typedSegments.size)
-            val queries = arrayOfNulls<Any>(route.queries.size)
+        val params = arrayOfNulls<Any>(route.typedSegments.size)
+        val queries = arrayOfNulls<Any>(route.queries.size)
 
+        // We can't really detect specific problems in the call parameters
+        // without making everything really complicated,
+        // so if the decoding fails we just return a simple error.
+        try {
             route.typedSegments.forEachIndexed { i, segment ->
                 params[i] = readBinary(source, segment.type!!)
             }
 
             val nullMap = source.readVarLong()
             route.queries.forEachIndexed { i, query ->
-                if((nullMap and (1L shl i)) != 0L) {
+                if ((nullMap and (1L shl i)) != 0L) {
                     queries[i] = readBinary(source, query.type)
-                } else if(query.optional) {
+                } else if (query.optional) {
                     queries[i] = query.default
                 } else {
-                    val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
+                    val description = if (query.description.isNotEmpty()) "(${query.description})" else "(no description)"
                     val type = "of type ${query.type.simpleName}"
                     throw InvalidStateException(
                         "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type"
                     )
                 }
             }
+        } catch(e: Throwable) {
+            val error = convertDecodeError(e)
+            mapError(error, target, f)
+            listener?.onFail(callId, route, error)
+        }
 
-            val listener = object: RouteListener {
-                override fun onStart(route: Route) = 0L
-                override fun onSucceed(id: Long, route: Route, result: Any?) {
-                    val writerIndex = target.writerIndex()
-                    try {
-                        target.writeByte(ResponseCode.Success.ordinal)
-                        writeBinary(result, target)
-                        f()
-                        listener?.onSucceed(callId, route, result)
-                    } catch(e: Throwable) {
-                        target.writerIndex(writerIndex)
-                        mapError(e, target, f)
-                        listener?.onFail(id, route, e)
-                    }
-                }
-                override fun onFail(id: Long, route: Route, reason: Throwable?) {
-                    mapError(reason, target, f)
-                    listener?.onFail(id, route, reason)
+        // Create a secondary listener that writes responses to the caller before forwarding to the original one.
+        val listener = object: RouteListener {
+            override fun onStart(route: Route) = 0L
+            override fun onSucceed(id: Long, route: Route, result: Any?) {
+                val writerIndex = target.writerIndex()
+                try {
+                    target.writeByte(ResponseCode.Success.ordinal)
+                    writeBinary(result, target)
+                    f()
+                    listener?.onSucceed(callId, route, result)
+                } catch(e: Throwable) {
+                    target.writerIndex(writerIndex)
+                    mapError(e, target, f)
+                    listener?.onFail(id, route, e)
                 }
             }
+            override fun onFail(id: Long, route: Route, reason: Throwable?) {
+                mapError(reason, target, f)
+                listener?.onFail(id, route, reason)
+            }
+        }
 
+        // Run the route handler.
+        try {
             route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
         } catch(e: Throwable) {
             mapError(e, target, f)
-            listener?.onFail(callId, route, e)
+            this.listener?.onFail(callId, route, e)
         }
     }
 
@@ -95,5 +106,10 @@ class BinaryRouter(
         target.writeByte(code.ordinal)
         target.writeString(desc)
         f()
+    }
+
+    fun convertDecodeError(error: Throwable?) = when(error) {
+        is InvalidStateException -> error
+        else -> InvalidStateException("invalid call parameter")
     }
 }
