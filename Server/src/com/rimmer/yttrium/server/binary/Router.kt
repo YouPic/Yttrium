@@ -58,40 +58,40 @@ class BinaryRouter(
                     )
                 }
             }
+
+            // Create a secondary listener that writes responses to the caller before forwarding to the original one.
+            val listener = object: RouteListener {
+                override fun onStart(route: Route) = 0L
+                override fun onSucceed(id: Long, route: Route, result: Any?) {
+                    val writerIndex = target.writerIndex()
+                    try {
+                        target.writeByte(ResponseCode.Success.ordinal)
+                        writeBinary(result, target)
+                        f()
+                        listener?.onSucceed(callId, route, result)
+                    } catch(e: Throwable) {
+                        target.writerIndex(writerIndex)
+                        mapError(e, target, f)
+                        listener?.onFail(id, route, e)
+                    }
+                }
+                override fun onFail(id: Long, route: Route, reason: Throwable?) {
+                    mapError(reason, target, f)
+                    listener?.onFail(id, route, reason)
+                }
+            }
+
+            // Run the route handler.
+            try {
+                route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
+            } catch(e: Throwable) {
+                mapError(e, target, f)
+                this.listener?.onFail(callId, route, e)
+            }
         } catch(e: Throwable) {
             val error = convertDecodeError(e)
             mapError(error, target, f)
             listener?.onFail(callId, route, error)
-        }
-
-        // Create a secondary listener that writes responses to the caller before forwarding to the original one.
-        val listener = object: RouteListener {
-            override fun onStart(route: Route) = 0L
-            override fun onSucceed(id: Long, route: Route, result: Any?) {
-                val writerIndex = target.writerIndex()
-                try {
-                    target.writeByte(ResponseCode.Success.ordinal)
-                    writeBinary(result, target)
-                    f()
-                    listener?.onSucceed(callId, route, result)
-                } catch(e: Throwable) {
-                    target.writerIndex(writerIndex)
-                    mapError(e, target, f)
-                    listener?.onFail(id, route, e)
-                }
-            }
-            override fun onFail(id: Long, route: Route, reason: Throwable?) {
-                mapError(reason, target, f)
-                listener?.onFail(id, route, reason)
-            }
-        }
-
-        // Run the route handler.
-        try {
-            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
-        } catch(e: Throwable) {
-            mapError(e, target, f)
-            this.listener?.onFail(callId, route, e)
         }
     }
 
