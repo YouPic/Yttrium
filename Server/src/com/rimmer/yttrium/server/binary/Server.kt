@@ -9,11 +9,11 @@ import io.netty.channel.ChannelPipeline
 fun listenBinary(
     context: ServerContext,
     port: Int,
-    pipeline: ChannelPipeline.() -> Unit = {},
+    pipeline: (ChannelPipeline.() -> Unit)? = null,
     handler: (ChannelHandlerContext, source: ByteBuf, target: ByteBuf, push: () -> Unit) -> Unit
 ) = listen(context, port) {
     addLast(BinaryHandler(handler))
-    pipeline()
+    pipeline?.invoke(this)
 }
 
 class BinaryHandler(

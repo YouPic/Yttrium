@@ -15,27 +15,20 @@ import io.netty.util.ReferenceCountUtil
 fun listenHttp(
     context: ServerContext,
     port: Int,
-    compress: Boolean = false,
     cors: Boolean = false,
-    pipeline: ChannelPipeline.() -> Unit = {},
+    pipeline: (ChannelPipeline.() -> Unit)? = null,
     handler: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit
 ) = listen(context, port) {
-    addLast(
-        HttpResponseEncoder(),
-        HttpRequestDecoder(),
-        HttpObjectAggregator(10 * 1024 * 1024),
-        HttpHandler(handler)
-    )
-
-    pipeline()
+    addLast(HttpResponseEncoder(), HttpRequestDecoder())
 
     if(cors) {
-        addLast(CorsHandler(CorsConfigBuilder.forAnyOrigin().allowedRequestHeaders("X-Requested-With").build()))
+        addLast(CorsHandler(CorsConfigBuilder.forAnyOrigin()
+            .allowedRequestHeaders("X-Requested-With")
+            .build()))
     }
 
-    if(compress) {
-        addLast(HttpContentCompressor())
-    }
+    addLast(HttpObjectAggregator(10 * 1024 * 1024), HttpHandler(handler))
+    pipeline?.invoke(this)
 }
 
 class HttpHandler(val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit): ChannelInboundHandlerAdapter() {
