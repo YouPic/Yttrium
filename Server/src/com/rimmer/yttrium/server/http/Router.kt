@@ -210,13 +210,8 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
 fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>) {
     if(request.content().readableBytes() > 0) {
         val bodyDecoder = HttpPostRequestDecoder(request)
-        while(bodyDecoder.hasNext()) {
-            val p = try {
-                bodyDecoder.next()
-            } catch(e: HttpPostRequestDecoder.EndOfDataDecoderException) {
-                // This is thrown when there is definitely no data left.
-                break
-            } as? HttpData ?: continue
+        while(try { bodyDecoder.hasNext() } catch(e: HttpPostRequestDecoder.EndOfDataDecoderException) { false }) {
+            val p = bodyDecoder.next() as? HttpData ?: continue
 
             // Check if this parameter is recognized.
             val name = p.name.hashCode()
