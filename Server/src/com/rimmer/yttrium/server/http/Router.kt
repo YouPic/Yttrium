@@ -4,12 +4,14 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.parseInt
 import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
-import com.rimmer.yttrium.serialize.JsonToken
+import com.rimmer.yttrium.serialize.readJson
 import com.rimmer.yttrium.serialize.readPrimitive
 import com.rimmer.yttrium.serialize.writeJson
 import com.rimmer.yttrium.sliceHash
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*
+import io.netty.handler.codec.http.multipart.HttpData
+import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder
 import io.netty.util.AsciiString
 import java.util.*
 
@@ -54,10 +56,13 @@ class HttpRouter(
             val params = parseParameters(route, parameters)
             val queries = parseQuery(route, request.uri())
 
-            // TODO: Parse request body here if needed.
+            // Parse any parameters that were provided through the request body.
+            parseBodyQuery(route, request, queries)
 
+            // Make sure all required parameters were provided, and handle optional ones.
             checkQueries(route, queries)
 
+            // Call the route with a listener that sends the result back to the client.
             val listener = object: RouteListener {
                 override fun onStart(route: Route) = 0L
                 override fun onSucceed(id: Long, route: Route, result: Any?) {
@@ -199,6 +204,34 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
     }
 
     return values
+}
+
+/** Parses any query parameters that were provided through the request body. */
+fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>) {
+    if(request.content().readableBytes() > 0) {
+        val bodyDecoder = HttpPostRequestDecoder(request)
+        while(bodyDecoder.hasNext()) {
+            val p = bodyDecoder.next() as? HttpData ?: continue
+
+            // Check if this parameter is recognized.
+            val name = p.name.hashCode()
+            route.queries.forEachIndexed { i, query ->
+                if(query.hash == name) {
+                    val buffer = p.byteBuf
+                    val index = buffer.readerIndex()
+
+                    // This is a bit ugly - we don't really know if the provided data is json or raw,
+                    // so we just try parsing it in both ways.
+                    try {
+                        queries[i] = readJson(buffer, query.type)
+                    } catch(e: Throwable) {
+                        buffer.readerIndex(index)
+                        queries[i] = readPrimitive(buffer.toString(Charsets.UTF_8), query.type)
+                    }
+                }
+            }
+        }
+    }
 }
 
 /** Makes sure that all required query parameters have been set correctly. */
