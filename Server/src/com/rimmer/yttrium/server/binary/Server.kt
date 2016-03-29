@@ -4,13 +4,16 @@ import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.listen
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelPipeline
 
 fun listenBinary(
     context: ServerContext,
     port: Int,
+    pipeline: ChannelPipeline.() -> Unit = {},
     handler: (ChannelHandlerContext, source: ByteBuf, target: ByteBuf, push: () -> Unit) -> Unit
 ) = listen(context, port) {
     addLast(BinaryHandler(handler))
+    pipeline()
 }
 
 class BinaryHandler(

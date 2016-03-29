@@ -5,25 +5,37 @@ import com.rimmer.yttrium.server.listen
 import io.netty.channel.ChannelFutureListener
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelPipeline
 import io.netty.handler.codec.http.*
+import io.netty.handler.codec.http.cors.CorsConfig
+import io.netty.handler.codec.http.cors.CorsConfigBuilder
+import io.netty.handler.codec.http.cors.CorsHandler
 import io.netty.util.ReferenceCountUtil
 
 fun listenHttp(
     context: ServerContext,
     port: Int,
     compress: Boolean = false,
+    cors: Boolean = false,
+    pipeline: ChannelPipeline.() -> Unit = {},
     handler: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit
 ) = listen(context, port) {
-    if(compress) {
-        addLast(HttpContentCompressor())
-    }
-
     addLast(
         HttpResponseEncoder(),
         HttpRequestDecoder(),
         HttpObjectAggregator(10 * 1024 * 1024),
         HttpHandler(handler)
     )
+
+    pipeline()
+
+    if(cors) {
+        addLast(CorsHandler(CorsConfigBuilder.forAnyOrigin().allowedRequestHeaders("X-Requested-With").build()))
+    }
+
+    if(compress) {
+        addLast(HttpContentCompressor())
+    }
 }
 
 class HttpHandler(val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit): ChannelInboundHandlerAdapter() {
