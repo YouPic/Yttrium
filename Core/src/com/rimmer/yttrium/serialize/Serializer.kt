@@ -66,6 +66,11 @@ fun writeJson(value: Any?, target: ByteBuf) {
             is Byte -> writer.value(value)
             is Short -> writer.value(value)
             is Unit -> writer.startObject().endObject()
+            is Collection<*> -> {
+                writer.startArray()
+                for(i in value) writeJson(i, target)
+                writer.endArray()
+            }
             else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
     }
@@ -93,6 +98,10 @@ fun writeBinary(value: Any?, target: ByteBuf) {
             is Byte -> target.writeVarInt(value.toInt())
             is Short -> target.writeVarInt(value.toInt())
             is Unit -> {}
+            is Collection<*> -> {
+                target.writeVarInt(value.size)
+                for(i in value) writeBinary(i, target)
+            }
             else -> throw InvalidStateException("Value $value cannot be serialized.")
         }
     }
