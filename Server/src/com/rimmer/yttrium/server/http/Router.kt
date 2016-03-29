@@ -84,11 +84,12 @@ class HttpRouter(
 }
 
 private class HttpSegment(
-    val routes: Array<Route>,
-    val routeHashes: IntArray,
-    val next: Array<HttpSegment>,
+    val localRoutes: Array<Route>,
+    val localHashes: IntArray,
+    val localWildcards: Array<Route>,
+    val nextRoutes: Array<HttpSegment>,
     val nextHashes: IntArray,
-    val wildcard: HttpSegment?
+    val nextWildcards: HttpSegment?
 )
 
 /**
@@ -97,13 +98,19 @@ private class HttpSegment(
  * which allows a searcher to take the first match.
  */
 private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpSegment {
-    val endPoints = routes.filter {
+    val (endPoints, wildcardEndpoints) = routes.filter {
         it.segments.size == segmentIndex + 1
-    }.sortedByDescending { it.version }.toTypedArray()
+    }.sortedByDescending {
+        it.version
+    }.partition {
+        it.segments[segmentIndex].type == null
+    }.run {
+        first.toTypedArray() to second.toTypedArray()
+    }
 
     val hashes = endPoints.map {
         val segment = it.segments[segmentIndex]
-        if(segment.type == null) segment.name.hashCode() else -1
+        segment.name.hashCode()
     }.toIntArray()
 
     val groups = routes.filter {
@@ -120,7 +127,7 @@ private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpS
     }
     val wildcards = if(wildcardRoutes.size > 0) buildSegments(wildcardRoutes, segmentIndex + 1) else null
 
-    return HttpSegment(endPoints, hashes, next, nextHashes, wildcards)
+    return HttpSegment(endPoints, hashes, wildcardEndpoints, next, nextHashes, wildcards)
 }
 
 /**
@@ -141,21 +148,25 @@ private fun findRoute(segment: HttpSegment, parameters: ArrayList<String>, versi
 
     val hash = url.sliceHash(segmentStart, segmentEnd)
     if(segmentEnd >= url.length || url[segmentEnd] == '?') {
-        segment.routeHashes.forEachIndexed { i, v ->
-            val route = segment.routes[i]
-            if((v == hash || v == -1) && route.version <= version) {
-                if(v == -1) parameters.add(url.substring(segmentStart, segmentEnd))
-                return route
+        segment.localHashes.forEachIndexed { i, v ->
+            val route = segment.localRoutes[i]
+            if((v == hash) && route.version <= version) return route
+        }
+
+        segment.localWildcards.forEach {
+            if(it.version <= version) {
+                parameters.add(url.substring(segmentStart, segmentEnd))
+                return it
             }
         }
         return null
     }
 
     val i = segment.nextHashes.indexOf(hash)
-    val handler = if(i >= 0) findRoute(segment.next[i], parameters, version, url, segmentEnd + 1) else null
+    val handler = if(i >= 0) findRoute(segment.nextRoutes[i], parameters, version, url, segmentEnd + 1) else null
     if(handler != null) return handler
 
-    val wildcard = segment.wildcard?.let { findRoute(it, parameters, version, url, segmentEnd + 1) }
+    val wildcard = segment.nextWildcards?.let { findRoute(it, parameters, version, url, segmentEnd + 1) }
     if(wildcard != null) {
         parameters.add(url.substring(segmentStart, segmentEnd))
     }
