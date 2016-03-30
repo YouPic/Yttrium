@@ -136,11 +136,14 @@ private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpS
  * with the path parameters of the returned route, in reverse order.
  */
 private fun findRoute(segment: HttpSegment, parameters: ArrayList<String>, version: Int, url: String, start: Int): Route? {
+    // Filter out any leading slashes.
+    var segmentStart = start
+    while(url.getOrNull(segmentStart) == '/') segmentStart++
+
     // Find the first url segment. This is used to create a set of possible methods.
-    val segmentStart = start
-    var segmentEnd = url.indexOf('/', start + 1)
+    var segmentEnd = url.indexOf('/', segmentStart + 1)
     if(segmentEnd == -1) {
-        segmentEnd = url.indexOf('?', start + 1)
+        segmentEnd = url.indexOf('?', segmentStart + 1)
         if(segmentEnd == -1) {
             segmentEnd = url.length
         }
@@ -197,7 +200,10 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
         val queries = query.split('&')
 
         // Parse each query parameter.
-        queries.forEach { q ->
+        for(q in queries) {
+            // Filter out any empty query parameters.
+            if(q.length == 0) continue
+
             val separator = q.indexOf('=')
             if(separator == -1) {
                 // Bad syntax.
