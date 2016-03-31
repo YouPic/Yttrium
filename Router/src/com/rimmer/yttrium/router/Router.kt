@@ -100,12 +100,13 @@ class Router(val plugins: List<Plugin<in Any>>) {
 
         // Create a list of query parameter -> handler parameter bindings.
         // Arguments that are already provided by a plugin are presumed to be used by that plugin.
-        val firstQuery = typedSegments.size + queries.size
+        val firstQuery = typedSegments.size
+        val existingQueries = queries.size
         val queryBindings = ArrayList<Int>()
         funQueries.forEachIndexed { i, q ->
             val index = firstQuery + i
             if(!providers[index]) {
-                queryBindings.add(index)
+                queryBindings.add(index + existingQueries)
                 queries.add(RouteQuery(q.name, q.name.hashCode(), types[index], q.optional, q.default, q.description))
                 swaggerRoute.parameters.add(
                     Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[index], q.default != null)
