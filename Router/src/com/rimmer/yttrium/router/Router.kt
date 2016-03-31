@@ -130,8 +130,8 @@ class Router(val plugins: List<Plugin<in Any>>) {
             usedPlugins,
             pathBindings.toIntArray(),
             queryBindings.toIntArray(),
-            types.size,
             existingQueries,
+            types.size,
             call
         )
         routes.add(route)
