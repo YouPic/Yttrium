@@ -100,7 +100,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
 
         // Create a list of query parameter -> handler parameter bindings.
         // Arguments that are already provided by a plugin are presumed to be used by that plugin.
-        val firstQuery = typedSegments.size
+        val firstQuery = typedSegments.size + queries.size
         val queryBindings = ArrayList<Int>()
         funQueries.forEachIndexed { i, q ->
             val index = firstQuery + i
