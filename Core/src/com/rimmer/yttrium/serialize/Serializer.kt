@@ -68,7 +68,10 @@ fun writeJson(value: Any?, target: ByteBuf) {
             is Unit -> writer.startObject().endObject()
             is Collection<*> -> {
                 writer.startArray()
-                for(i in value) writeJson(i, target)
+                for(i in value) {
+                    writer.arrayField()
+                    writeJson(i, target)
+                }
                 writer.endArray()
             }
             else -> throw InvalidStateException("Value $value cannot be serialized.")
