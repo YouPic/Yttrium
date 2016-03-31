@@ -8,6 +8,7 @@ import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.connect
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
+import java.io.IOException
 import java.util.*
 
 interface BinaryClient {
@@ -30,8 +31,27 @@ interface BinaryClient {
      */
     fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>)
 
+    /**
+     * Calls a route and subscribes on its results.
+     * @param route The hash of the route to call
+     * @param path An ordered set of path parameters.
+     * @param queries An ordered set of query parameters.
+     * @param target The expected result type of the route.
+     * @param f Called to receive the results. This will continue being called until the subscription is closed.
+     * @return A subscription id that can be used to unsubscribe.
+     */
+    fun subscribe(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit): Int
+
+    /**
+     * Stops receiving messages from the provided subscription id.
+     */
+    fun unsubscribe(subscription: Int)
+
     /** Closes this connection. Any calls after this will fail. */
     fun close()
+
+    /** Set to true as long as the connection is active. */
+    val connected: Boolean
 }
 
 fun connectBinary(
@@ -47,23 +67,42 @@ fun connectBinary(
 })
 
 class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): BinaryDecoder(), BinaryClient {
-    private data class Request(val target: Class<*>, val handler: ((Any?, Throwable?) -> Unit)?)
+    private data class Request(val target: Class<*>, val handler: ((Any?, Throwable?) -> Unit)?, val isPush: Boolean)
 
     private var context: ChannelHandlerContext? = null
     private val requests = ArrayList<Request?>()
     private var nextRequest = 0
+
+    override val connected: Boolean get() = context != null && context!!.channel().isActive
 
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
         onConnect(this, null)
     }
 
+    override fun channelInactive(context: ChannelHandlerContext) {
+        // Fail all pending requests.
+        val error = IOException("Connection was closed.")
+        for(r in requests) {
+            r?.handler?.invoke(null, error)
+        }
+        requests.clear()
+    }
+
     override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>) {
-        performRequest(Request(target, null), route, path, queries)
+        performRequest(Request(target, null, false), route, path, queries)
     }
 
     override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit) {
-        performRequest(Request(target, f), route, path, queries)
+        performRequest(Request(target, f, false), route, path, queries)
+    }
+
+    override fun subscribe(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit): Int {
+        return performRequest(Request(target, null, true), route, path, queries)
+    }
+
+    override fun unsubscribe(subscription: Int) {
+        finishRequest(subscription)
     }
 
     override fun close() {
@@ -77,12 +116,18 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
             return
         }
 
-        mapResponse(requests[request]!!, packet)
-        finishRequest(request)
+        val requestData = requests[request]!!
+        mapResponse(requestData, packet)
+
+        // Only remove the request if it was one-use.
+        if(!requestData.isPush) {
+            finishRequest(request)
+        }
     }
 
-    private fun performRequest(r: Request, route: Int, path: Array<Any?>, queries: Array<Any?>) {
-        writePacket(context!!, addRequest(r)) { target, commit ->
+    private fun performRequest(r: Request, route: Int, path: Array<Any?>, queries: Array<Any?>): Int {
+        val id = addRequest(r)
+        writePacket(context!!, id) { target, commit ->
             target.writeVarInt(route)
 
             for(p in path) {
@@ -95,6 +140,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
             }
             commit()
         }
+        return id
     }
 
     private fun addRequest(r: Request): Int {
