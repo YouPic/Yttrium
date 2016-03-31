@@ -7,6 +7,7 @@ fun routeHandler(
     plugins: List<RoutePlugin>,
     pathBindings: IntArray,
     queryBindings: IntArray,
+    firstQuery: Int,
     argumentCount: Int,
     call: RouteContext.(Array<Any?>) -> Task<*>
 ) = { context: RouteContext, listener: RouteListener ->
@@ -24,7 +25,7 @@ fun routeHandler(
 
         var queryIndex = 0
         while(queryIndex < queryBindings.size) {
-            arguments[queryBindings[queryIndex]] = context.queryParameters[queryIndex]
+            arguments[queryBindings[queryIndex]] = context.queryParameters[queryIndex + firstQuery]
             queryIndex++
         }
 

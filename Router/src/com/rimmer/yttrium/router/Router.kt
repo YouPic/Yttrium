@@ -106,7 +106,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
         funQueries.forEachIndexed { i, q ->
             val index = firstQuery + i
             if(!providers[index]) {
-                queryBindings.add(index + existingQueries)
+                queryBindings.add(index)
                 queries.add(RouteQuery(q.name, q.name.hashCode(), types[index], q.optional, q.default, q.description))
                 swaggerRoute.parameters.add(
                     Swagger.Parameter(q.name, Swagger.ParameterType.Query, q.description, types[index], q.default != null)
@@ -131,6 +131,7 @@ class Router(val plugins: List<Plugin<in Any>>) {
             pathBindings.toIntArray(),
             queryBindings.toIntArray(),
             types.size,
+            existingQueries,
             call
         )
         routes.add(route)
