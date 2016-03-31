@@ -106,7 +106,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     }
 
     override fun close() {
-        context!!.close()
+        context?.close()
     }
 
     override fun handlePacket(context: ChannelHandlerContext, request: Int, packet: ByteBuf) {
