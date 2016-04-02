@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.serialize
 
+import com.rimmer.yttrium.ByteString
 import io.netty.buffer.ByteBuf
 
 /*
@@ -14,9 +15,14 @@ fun ByteBuf.writeFieldId(id: Int) {
     writeByte(id)
 }
 
+fun ByteBuf.writeByteString(s: ByteString) {
+    writeVarInt(s.size)
+    s.write(this)
+}
+
 fun ByteBuf.writeString(s: String) {
     writeVarInt(s.length)
-    writeBytes(s.toByteArray())
+    writeBytes(s.toByteArray(Charsets.UTF_8))
 }
 
 fun ByteBuf.writeVarInt(value: Int) {

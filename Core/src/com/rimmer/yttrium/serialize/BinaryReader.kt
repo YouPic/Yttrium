@@ -1,5 +1,7 @@
 package com.rimmer.yttrium.serialize
 
+import com.rimmer.yttrium.ByteString
+import com.rimmer.yttrium.LocalByteString
 import io.netty.buffer.ByteBuf
 
 /*
@@ -13,6 +15,13 @@ fun ByteBuf.readString(): String {
     val bytes = ByteArray(length)
     readBytes(bytes)
     return String(bytes)
+}
+
+fun ByteBuf.readByteString(): ByteString {
+    val length = readVarInt()
+    val bytes = ByteArray(length)
+    readBytes(bytes)
+    return LocalByteString(bytes)
 }
 
 fun ByteBuf.readVarInt(): Int {

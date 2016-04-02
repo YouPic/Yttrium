@@ -73,7 +73,7 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
 
     override val size: Int get() = buffer.remaining()
     override fun get(index: Int) = buffer.get(buffer.position() + index)
-    
+
     override fun contains(element: Byte): Boolean {
         val start = buffer.position()
         while(buffer.hasRemaining()) {
