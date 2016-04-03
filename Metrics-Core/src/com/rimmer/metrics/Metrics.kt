@@ -9,10 +9,10 @@ interface MetricsWriter {
      * Starts a new profiler event within the current call.
      * @return An event index to send to endQuery.
      */
-    fun startEvent(eventType: EventType, type: String): Int
+    fun startEvent(call: Int, eventType: EventType, type: String): Int
 
     /** Indicates that the provided event id has finished. */
-    fun endEvent(id: Int)
+    fun endEvent(call: Int, id: Int)
 }
 
 class Metrics: MetricsWriter {
@@ -32,68 +32,79 @@ class Metrics: MetricsWriter {
 
     var sender: Sender? = null
     private val paths = HashMap<String, Path>()
-    private val currentCall = ThreadLocal<Call>()
+    private val calls = ArrayList<Call?>()
+    private var nextCall = 0
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
-    fun start(path: String, parameters: Map<String, String>) {
+    fun start(path: String, parameters: Map<String, String>): Int {
         val startTime = System.nanoTime()
         val startDate = DateTime.now()
-        currentCall.set(Call(path, startDate, startTime, parameters))
+        val call = Call(path, startDate, startTime, parameters)
+
+        val i = nextCall
+        if(i >= calls.size) {
+            calls.add(call)
+            nextCall++
+        } else {
+            calls[i] = call
+            val next = calls.indexOfFirst { it == null }
+            nextCall = if(next == -1) calls.size else next
+        }
+        return i
     }
 
     /** Indicates that the current action has completed. It is added to the metrics. */
-    fun finish() {
+    fun finish(callId: Int) {
         val time = System.nanoTime()
-        val call = currentCall.get()
+        val call = getCall(callId) ?: return
         call.endTime = time
 
-        val path = synchronized(this) {
-            var path = paths[call.path]
-            if(path === null) {
-                path = Path()
-                paths.put(call.path, path)
-            }
-            path
-        }!!
-
-        synchronized(path) {
-            path.calls.add(call)
-            if(time - path.lastSend > 60000000000L) {
-                sendStats(path)
-                path.calls.clear()
-                path.lastSend = time
-            }
+        var path = paths[call.path]
+        if(path === null) {
+            path = Path()
+            paths.put(call.path, path)
         }
+
+        path.calls.add(call)
+        if(time - path.lastSend > 60000000000L) {
+            sendStats(path)
+            path.calls.clear()
+            path.lastSend = time
+        }
+
+        removeCall(callId)
     }
 
     /** Discards the current action without adding to the metrics, for example if the call was forwarded. */
-    fun discard() { currentCall.set(null) }
+    fun discard(call: Int) {
+        removeCall(call)
+    }
 
     /**
      * Indicates that the current call did not complete correctly.
      * Incorrect calls are not used in the metrics.
      * @param wasError If set, the failure is reported in the metrics as an internal server error.
      */
-    fun fail(wasError: Boolean, reason: String) {
-        currentCall.get()?.run {
+    fun fail(call: Int, wasError: Boolean, reason: String) {
+        getCall(call)?.run {
             failed = true
             error = wasError
             failReason = reason
-            finish()
+            finish(call)
         }
     }
 
-    override fun startEvent(eventType: EventType, type: String): Int {
+    override fun startEvent(call: Int, eventType: EventType, type: String): Int {
         val startTime = System.nanoTime()
         val startDate = DateTime.now()
-        return currentCall.get()?.run {
+        return getCall(call)?.run {
             events.add(Event(eventType, type, startDate, startTime, startTime))
             events.size - 1
         } ?: 0
     }
 
-    override fun endEvent(id: Int) {
-        currentCall.get()?.run {
+    override fun endEvent(call: Int, id: Int) {
+        getCall(call)?.run {
             val event = events[id]
             events[id] = event.copy(endTime = System.nanoTime())
         }
@@ -146,5 +157,19 @@ class Metrics: MetricsWriter {
             println("Could not send metrics:")
             e.printStackTrace()
         }
+    }
+
+    private fun getCall(id: Int): Call? {
+        if(calls.size <= id || calls[id] == null) {
+            println("Received unknown call id $id")
+            return null
+        } else {
+            return calls[id]
+        }
+    }
+
+    private fun removeCall(id: Int) {
+        calls[id] = null
+        nextCall = id
     }
 }
