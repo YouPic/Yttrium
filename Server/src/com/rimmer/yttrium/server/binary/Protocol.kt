@@ -48,15 +48,15 @@ inline fun readPacket(source: ByteBuf, f: (Int, ByteBuf) -> Unit): Boolean {
     source.markReaderIndex()
 
     // Each packet starts with a packet length and a request id.
-    val length = source.readInt()
+    val length = source.readIntLE()
     val index = source.readerIndex()
-    val request = source.readVarInt()
 
     // If we don't have the full buffer yet we wait for more data.
     if(source.readableBytes() + (source.readerIndex() - index) < length) {
         source.resetReaderIndex()
         return false
     } else {
+        val request = source.readVarInt()
         f(request, source)
         return true
     }
@@ -65,13 +65,13 @@ inline fun readPacket(source: ByteBuf, f: (Int, ByteBuf) -> Unit): Boolean {
 inline fun writePacket(context: ChannelHandlerContext, request: Int, writer: (ByteBuf, () -> Unit) -> Unit) {
     // Create a response buffer with space for the length.
     val target = context.alloc().buffer()
-    target.writeInt(0)
+    target.writeIntLE(0)
     target.writeVarInt(request)
 
     // Send the request to the handler.
     writer(target) {
         // Set the final packet size.
-        target.setInt(0, target.writerIndex() - 4)
+        target.setIntLE(0, target.writerIndex() - 4)
         context.writeAndFlush(target, context.voidPromise())
     }
 }
