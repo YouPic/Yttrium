@@ -1,9 +1,9 @@
 package com.rimmer.metrics.server
 
-import com.rimmer.metrics.ErrorPacket
-import com.rimmer.metrics.ProfilePacket
 import com.rimmer.metrics.Sender
-import com.rimmer.metrics.StatPacket
+import com.rimmer.metrics.generated.type.ErrorPacket
+import com.rimmer.metrics.generated.type.ProfilePacket
+import com.rimmer.metrics.generated.type.StatPacket
 import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.yttrium.server.binary.connectBinary

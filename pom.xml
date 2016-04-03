@@ -35,8 +35,8 @@
         </dependency>
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
-            <artifactId>Yttrium-Router</artifactId>
-            <version>2c956a19626e7bc1c20f8427b0dfb7ce5b45c779</version>
+            <artifactId>Yttrium-Core</artifactId>
+            <version>5c9ca416c3191828d6036ebff49f3053d740f91c</version>
         </dependency>
     </dependencies>
 

@@ -1,6 +1,7 @@
 package com.rimmer.metrics.es
 
 import com.rimmer.metrics.*
+import com.rimmer.metrics.generated.type.*
 import org.elasticsearch.client.Client
 import org.elasticsearch.common.xcontent.XContentFactory
 

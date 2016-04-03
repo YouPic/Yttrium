@@ -1,10 +1,12 @@
 package com.rimmer.metrics.server
 
-import com.rimmer.metrics.*
+import com.rimmer.metrics.generated.type.*
 import org.joda.time.DateTime
 import java.util.*
 
-class ErrorInstance(val time: DateTime, val trace: String, val parameters: Map<String, String>)
+val Interval.length: Long get() = end - start
+
+class ErrorInstance(val time: DateTime, val trace: String, val cause: String, val parameters: Map<String, String>)
 
 class ErrorClass(val cause: String, val trace: String) {
     var count = 0
@@ -98,7 +100,7 @@ class MetricStore {
         val type = classes.getOrPut(packet.cause) {ErrorClass(packet.cause, packet.trace)}
         type.count++
         type.lastOccurrence = packet.time
-        type.instances.add(ErrorInstance(packet.time, packet.trace, packet.parameters))
+        type.instances.add(ErrorInstance(packet.time, packet.trace, packet.cause, emptyMap()))
     }
 }
 
