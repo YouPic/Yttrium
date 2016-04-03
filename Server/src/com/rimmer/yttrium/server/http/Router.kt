@@ -9,6 +9,7 @@ import com.rimmer.yttrium.serialize.readPrimitive
 import com.rimmer.yttrium.serialize.writeJson
 import com.rimmer.yttrium.sliceHash
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.multipart.HttpData
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder
@@ -46,10 +47,11 @@ class HttpRouter(
             return
         }
 
-        val callId = listener?.onStart(route) ?: 0
-        val fail = {e: Throwable? ->
+        val eventLoop = context.channel().eventLoop()
+        val callId = listener?.onStart(eventLoop, route) ?: 0
+        val fail = {r: RouteContext, e: Throwable? ->
             f(mapError(e))
-            listener?.onFail(callId, route, e)
+            listener?.onFail(r, e)
         }
 
         try {
@@ -64,22 +66,25 @@ class HttpRouter(
 
             // Call the route with a listener that sends the result back to the client.
             val listener = object: RouteListener {
-                override fun onStart(route: Route) = 0L
-                override fun onSucceed(id: Long, route: Route, result: Any?) {
+                override fun onStart(eventLoop: EventLoop, route: Route) = 0L
+                override fun onSucceed(route: RouteContext, result: Any?) {
                     val buffer = context.alloc().buffer()
                     try {
                         writeJson(result, buffer)
                         val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer)
                         response.headers().set(HttpHeaderNames.CONTENT_TYPE, jsonContentType)
                         f(response)
-                        listener?.onSucceed(callId, route, result)
-                    } catch(e: Throwable) { fail(e) }
+                        listener?.onSucceed(route, result)
+                    } catch(e: Throwable) { fail(route, e) }
                 }
-                override fun onFail(id: Long, route: Route, reason: Throwable?) { fail(reason) }
+                override fun onFail(route: RouteContext, reason: Throwable?) { fail(route, reason) }
             }
 
-            route.handler(RouteContext(context, context.channel().eventLoop(), route, params, queries, callId), listener)
-        } catch(e: Throwable) { fail(e) }
+            route.handler(RouteContext(context, eventLoop, route, params, queries, callId), listener)
+        } catch(e: Throwable) {
+            // We don't have the call parameters here, so we just send a route context without them.
+            fail(RouteContext(context, eventLoop, route, emptyArray(), emptyArray(), callId), e)
+        }
     }
 }
 

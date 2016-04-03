@@ -11,7 +11,7 @@ fun routeHandler(
     argumentCount: Int,
     call: RouteContext.(Array<Any?>) -> Task<*>
 ) = { context: RouteContext, listener: RouteListener ->
-    val listenerId = listener.onStart(route)
+    val listenerId = listener.onStart(context.eventLoop, route)
 
     try {
         val arguments = arrayOfNulls<Any?>(argumentCount)
@@ -38,11 +38,11 @@ fun routeHandler(
                     if(e == null) {
                         modifyResult(plugin, r!!)
                     } else {
-                        listener.onFail(listenerId, route, e)
+                        listener.onFail(context, e)
                     }
                 }
             } else {
-                listener.onSucceed(listenerId, route, result)
+                listener.onSucceed(context, result)
             }
         }
 
@@ -55,7 +55,7 @@ fun routeHandler(
                     if(e == null) {
                         modifyCall(plugin, args)
                     } else {
-                        listener.onFail(listenerId, route, e)
+                        listener.onFail(context, e)
                     }
                 }
             } else {
@@ -63,7 +63,7 @@ fun routeHandler(
                     if(e == null) {
                         modifyResult(plugins.iterator(), r)
                     } else {
-                        listener.onFail(listenerId, route, e)
+                        listener.onFail(context, e)
                     }
                 }
             }
@@ -71,7 +71,7 @@ fun routeHandler(
 
         modifyCall(plugins.iterator(), arguments)
     } catch(e: Throwable) {
-        listener.onFail(listenerId, route, e)
+        listener.onFail(context, e)
     }
 }
 

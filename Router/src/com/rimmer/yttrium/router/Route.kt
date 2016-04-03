@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.router
 
+import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
@@ -103,21 +104,21 @@ interface RouteListener {
      * This is called whenever a route call starts.
      * @return A listener id that will be sent to any followup calls for this route.
      */
-    fun onStart(route: Route): Long
+    fun onStart(eventLoop: EventLoop, route: Route): Long
 
     /**
      * This is called whenever a route call succeeds.
-     * @param id The id that was previously returned by onStart.
+     * @param route The context for this route, including the call id returned by onStart.
      * @param result The returned result of the route.
      */
-    fun onSucceed(id: Long, route: Route, result: Any?)
+    fun onSucceed(route: RouteContext, result: Any?)
 
     /**
      * This is called whenever a route call fails.
-     * @param id The id that was previously returned by onStart.
+     * @param route The context for this route, including the call id returned by onStart.
      * @param reason The reason this call failed, if any.
      */
-    fun onFail(id: Long, route: Route, reason: Throwable?)
+    fun onFail(route: RouteContext, reason: Throwable?)
 }
 
 /**
@@ -131,12 +132,12 @@ interface RouteListener {
  */
 class RouteContext(
     val channel: ChannelHandlerContext,
-    val eventLoop: EventLoop,
+    eventLoop: EventLoop,
     val route: Route,
     val pathParameters: Array<Any?>,
     val queryParameters: Array<Any?>,
-    val id: Long
-) {
+    id: Long
+): Context(eventLoop, id) {
     fun <T> finish(v: T) = Task<T>().finish(v)
     fun finish() = Task<Unit>().finish(Unit)
 
