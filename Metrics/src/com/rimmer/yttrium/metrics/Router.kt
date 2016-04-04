@@ -11,11 +11,14 @@ import io.netty.channel.EventLoop
 
 class MetricsListener(val metrics: Metrics, val next: RouteListener?): RouteListener {
     override fun onStart(eventLoop: EventLoop, route: Route): Long {
-        return metrics.start(route.name, emptyMap()).toLong()
+        val id = metrics.start(route.name, emptyMap()).toLong()
+        next?.onStart(eventLoop, route)
+        return id
     }
 
     override fun onSucceed(route: RouteContext, result: Any?) {
         metrics.finish(route.id.toInt())
+        next?.onSucceed(route, result)
     }
 
     override fun onFail(route: RouteContext, reason: Throwable?) {
@@ -26,5 +29,6 @@ class MetricsListener(val metrics: Metrics, val next: RouteListener?): RouteList
             else -> true
         }
         metrics.fail(route.id.toInt(), wasError, reason?.message ?: "")
+        next?.onFail(route, reason)
     }
 }
