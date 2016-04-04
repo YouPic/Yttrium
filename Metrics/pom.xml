@@ -81,7 +81,7 @@
         <dependency>
             <groupId>com.github.Le-Chiffre.Metrics</groupId>
             <artifactId>Metrics-Core</artifactId>
-            <version>ccbd154f88317691c06adaa137f1eaa745e253dc</version>
+            <version>ec06121efb196da12f5ce95c3157cacc1fa0679f</version>
         </dependency>
     </dependencies>
 </project>

@@ -11,13 +11,17 @@ import io.netty.channel.EventLoop
 
 class MetricsListener(val metrics: Metrics, val next: RouteListener?): RouteListener {
     override fun onStart(eventLoop: EventLoop, route: Route): Long {
-        val id = metrics.start(route.name, emptyMap()).toLong()
+        val id = synchronized(metrics) {
+            metrics.start(route.name, emptyMap()).toLong()
+        }
         next?.onStart(eventLoop, route)
         return id
     }
 
     override fun onSucceed(route: RouteContext, result: Any?) {
-        metrics.finish(route.id.toInt())
+        synchronized(metrics) {
+            metrics.finish(route.id.toInt())
+        }
         next?.onSucceed(route, result)
     }
 
@@ -28,7 +32,9 @@ class MetricsListener(val metrics: Metrics, val next: RouteListener?): RouteList
             is UnauthorizedException -> false
             else -> true
         }
-        metrics.fail(route.id.toInt(), wasError, reason?.message ?: "")
+        synchronized(metrics) {
+            metrics.fail(route.id.toInt(), wasError, reason?.message ?: "")
+        }
         next?.onFail(route, reason)
     }
 }
