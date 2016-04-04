@@ -32,7 +32,7 @@ class ConsoleSender: Sender {
     }
 
     fun percentile(intervals: List<Interval>, percentile: Double): Long {
-        val e = intervals[Math.ceil(intervals.size * percentile).toInt()]
+        val e = intervals[Math.ceil((intervals.size - 1) * percentile).toInt()]
         return e.end - e.start
     }
 }
