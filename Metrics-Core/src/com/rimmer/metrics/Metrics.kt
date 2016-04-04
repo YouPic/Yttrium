@@ -99,9 +99,8 @@ class Metrics: MetricsWriter {
 
     override fun startEvent(call: Int, eventType: EventType, type: String): Int {
         val startTime = System.nanoTime()
-        val startDate = DateTime.now()
         return getCall(call)?.run {
-            events.add(Event(eventType, type, startDate, startTime, startTime))
+            events.add(Event(eventType, type, startTime, startTime))
             events.size - 1
         } ?: 0
     }
@@ -115,9 +114,8 @@ class Metrics: MetricsWriter {
 
     override fun onEvent(call: Int, eventType: EventType, type: String, elapsedNanos: Long) {
         getCall(call)?.run {
-            val startDate = DateTime.now().minusMillis((elapsedNanos / 1000000L).toInt())
             val endTime = System.nanoTime()
-            events.add(Event(eventType, type, startDate, endTime - elapsedNanos, endTime))
+            events.add(Event(eventType, type, endTime - elapsedNanos, endTime))
         }
     }
 

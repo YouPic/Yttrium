@@ -23,7 +23,6 @@ data ProfilePacket where
 data Event where
     event: EventType
     "type": String
-    startDate: Date
     startTime: Long
     endTime: Long
 

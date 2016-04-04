@@ -12,7 +12,7 @@ data class ProfilePacket(
     val time: DateTime,
     val start: Long,
     val end: Long,
-    val events: ArrayList<Event>
+    val events: List<Event>
 ): Writable {
     override fun encodeJson(buffer: ByteBuf) {
         val encoder = JsonWriter(buffer)
@@ -30,6 +30,7 @@ data class ProfilePacket(
         encoder.field(eventsFieldName)
         encoder.startArray()
         for(o in events) {
+            encoder.arrayField()
             o.encodeJson(buffer)
         }
         encoder.endArray()

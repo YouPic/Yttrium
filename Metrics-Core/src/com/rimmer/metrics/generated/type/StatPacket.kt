@@ -11,7 +11,7 @@ data class StatPacket(
     val server: String,
     val time: DateTime,
     val totalElapsed: Long,
-    val intervals: ArrayList<Interval>
+    val intervals: List<Interval>
 ): Writable {
     override fun encodeJson(buffer: ByteBuf) {
         val encoder = JsonWriter(buffer)
@@ -27,6 +27,7 @@ data class StatPacket(
         encoder.field(intervalsFieldName)
         encoder.startArray()
         for(o in intervals) {
+            encoder.arrayField()
             o.encodeJson(buffer)
         }
         encoder.endArray()

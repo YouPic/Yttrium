@@ -9,7 +9,6 @@ import com.rimmer.yttrium.serialize.*
 data class Event(
     val event: EventType,
     val type: String,
-    val startDate: DateTime,
     val startTime: Long,
     val endTime: Long
 ): Writable {
@@ -20,8 +19,6 @@ data class Event(
         event.encodeJson(buffer)
         encoder.field(typeFieldName)
         encoder.value(type)
-        encoder.field(startDateFieldName)
-        encoder.value(startDate)
         encoder.field(startTimeFieldName)
         encoder.value(startTime)
         encoder.field(endTimeFieldName)
@@ -35,10 +32,8 @@ data class Event(
         buffer.writeFieldId(2)
         buffer.writeString(type)
         buffer.writeFieldId(3)
-        buffer.writeVarLong(startDate.millis)
-        buffer.writeFieldId(4)
         buffer.writeVarLong(startTime)
-        buffer.writeFieldId(5)
+        buffer.writeFieldId(4)
         buffer.writeVarLong(endTime)
         buffer.endObject()
     }
@@ -52,8 +47,6 @@ data class Event(
         val eventFieldHash = "event".hashCode()
         val typeFieldName = "type".toByteArray()
         val typeFieldHash = "type".hashCode()
-        val startDateFieldName = "startDate".toByteArray()
-        val startDateFieldHash = "startDate".hashCode()
         val startTimeFieldName = "startTime".toByteArray()
         val startTimeFieldHash = "startTime".hashCode()
         val endTimeFieldName = "endTime".toByteArray()
@@ -62,7 +55,6 @@ data class Event(
         fun fromBinary(buffer: ByteBuf): Event {
             var event: EventType? = null
             var type: String? = null
-            var startDate: DateTime? = null
             var startTime: Long = 0L
             var endTime: Long = 0L
             
@@ -76,27 +68,23 @@ data class Event(
                         type = buffer.readString()
                     }
                     3 -> {
-                        startDate = buffer.readVarLong().let {DateTime(it)}
-                    }
-                    4 -> {
                         startTime = buffer.readVarLong()
                     }
-                    5 -> {
+                    4 -> {
                         endTime = buffer.readVarLong()
                     }
                 }
             }
-            if(event == null || type == null || startDate == null) {
+            if(event == null || type == null) {
                 throw InvalidStateException("Event instance is missing required fields")
             }
-            return Event(event, type, startDate, startTime, endTime)
+            return Event(event, type, startTime, endTime)
         }
 
         fun fromJson(buffer: ByteBuf): Event {
             val token = JsonToken(buffer)
             var event: EventType? = null
             var type: String? = null
-            var startDate: DateTime? = null
             var startTime: Long = 0L
             var endTime: Long = 0L
             token.expect(JsonToken.Type.StartObject)
@@ -114,10 +102,6 @@ data class Event(
                             token.expect(JsonToken.Type.StringLit)
                             type = token.stringPayload
                         }
-                        startDateFieldHash -> {
-                            token.expect(JsonToken.Type.StringLit)
-                            startDate = DateTime.parse(token.stringPayload)
-                        }
                         startTimeFieldHash -> {
                             token.expect(JsonToken.Type.NumberLit)
                             startTime = token.numberPayload.toLong()
@@ -131,10 +115,10 @@ data class Event(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            if(event == null || type == null || startDate == null) {
+            if(event == null || type == null) {
                 throw InvalidStateException("Event instance is missing required fields")
             }
-            return Event(event, type, startDate, startTime, endTime)
+            return Event(event, type, startTime, endTime)
         }
     }
 }

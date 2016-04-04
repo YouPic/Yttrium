@@ -25,7 +25,7 @@ class ElasticSender(val search: Client): Sender {
             json.startObject()
                 .field("eventType", it.event)
                 .field("eventKind", it.type)
-                .field("time", it.startDate)
+                .field("time", profile.time.plusMillis(((it.startTime - profile.start) / 1000000).toInt()))
                 .field("start", it.startTime)
                 .field("end", it.endTime)
             .endObject()
