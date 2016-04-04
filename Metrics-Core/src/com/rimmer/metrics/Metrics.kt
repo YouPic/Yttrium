@@ -13,6 +13,9 @@ interface MetricsWriter {
 
     /** Indicates that the provided event id has finished. */
     fun endEvent(call: Int, id: Int)
+
+    /** Adds a completed event, including the elapsed time. */
+    fun onEvent(call: Int, eventType: EventType, type: String, elapsedNanos: Long)
 }
 
 class Metrics: MetricsWriter {
@@ -107,6 +110,14 @@ class Metrics: MetricsWriter {
         getCall(call)?.run {
             val event = events[id]
             events[id] = event.copy(endTime = System.nanoTime())
+        }
+    }
+
+    override fun onEvent(call: Int, eventType: EventType, type: String, elapsedNanos: Long) {
+        getCall(call)?.run {
+            val startDate = DateTime.now().minusMillis((elapsedNanos / 1000000L).toInt())
+            val endTime = System.nanoTime()
+            events.add(Event(eventType, type, startDate, endTime - elapsedNanos, endTime))
         }
     }
 
