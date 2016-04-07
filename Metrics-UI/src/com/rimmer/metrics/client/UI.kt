@@ -1,6 +1,12 @@
 package com.rimmer.metrics.client
 
+import com.rimmer.metrics.server.generated.type.StatsPacket
+import com.rimmer.yttrium.server.binary.BinaryClient
+import com.rimmer.yttrium.server.binary.connectBinary
+import com.rimmer.yttrium.server.binary.routeHash
+import com.rimmer.yttrium.server.runClient
 import javafx.application.Application
+import javafx.application.Platform
 import javafx.scene.Scene
 import javafx.scene.chart.LineChart
 import javafx.scene.chart.NumberAxis
@@ -8,78 +14,20 @@ import javafx.scene.chart.XYChart
 import javafx.stage.Stage
 import javafx.util.StringConverter
 import org.joda.time.DateTime
-import org.joda.time.format.DateTimeFormatter
-import java.net.InetAddress
-import java.util.*
 
-/*
-/** The ElasticSearch configuration. */
-val elasticCluster = System.getenv("ELASTIC_CLUSTER") ?: "bb4fc4f2225aaadaa61abd68ec38b820"
-val elasticRegion = System.getenv("ELASTIC_REGION") ?: "eu-west-1"
-val elasticPort = Integer.parseInt(System.getenv("ELASTIC_PORT") ?: "9343")
-val elasticUser = System.getenv("ELASTIC_USER") ?: "admin"
-val elasticPassword = System.getenv("ELASTIC_PASSWORD") ?: "fgkf4h5ees"
+val host = "127.0.0.1"
+val port = 1338
+val password = "mysecretpassword"
 
 fun ceilTimeHour(time: DateTime) = time.withTime(time.hourOfDay + 1, 0, 0, 0)
 
-fun parseStatPoint(stat: Map<*, *>, point: String) = XYChart.Data<Number, Number>(
-    DateTime.parse(stat["time"] as String).millis, (stat["stat"] as Map<String, Number>)[point]
-)
+class StatGraph {
+    val chart: LineChart<Number, Number>
+    val average = XYChart.Series<Number, Number>()
+    val median = XYChart.Series<Number, Number>()
+    val max = XYChart.Series<Number, Number>()
 
-class MetricModel {
-    inner class Point {
-        var totalTime = 0L
-        var totalCalls = 0L
-    }
-
-    val search = TransportClient.builder()
-        .addPlugin(ShieldPlugin::class.java)
-        .settings(Settings.settingsBuilder()
-            .put("cluster.name", elasticCluster)
-            .put("shield.transport.ssl", true)
-            .put("request.headers.X-Found-Cluster", elasticCluster)
-            .put("shield.user", "${elasticUser}:${elasticPassword}")
-            .build()
-        ).build().addTransportAddress(
-            InetSocketTransportAddress(InetAddress.getByName("$elasticCluster.$elasticRegion.aws.found.io"), elasticPort)
-    )
-
-    val timeMap = HashMap<Long, Point>()
-
-    fun update() {
-        val result = search.prepareSearch("metrics").setTypes("stat").execute().addListener(object: ActionListener<SearchResponse> {
-            override fun onFailure(e: Throwable) {}
-            override fun onResponse(response: SearchResponse) {
-                response.hits.hits.forEach {
-                    val entry = it.source
-                    val date = DateTime.parse(entry["time"] as String)
-                    //val point = timeMap.putIfAbsent(date.millis / 60000, Point())
-                    val stat = entry["stat"] as Map<String, Number>
-                    val average = stat["average"]!!
-                    val count = stat["count"]!!
-
-                    point.totalCalls += count.toLong()
-                    point.totalTime += average.toLong() * count.toLong()
-                }
-            }
-        })
-
-
-        result.hits.hits.forEach {
-            val data = it.source
-            average.data.add(parseStatPoint(data, "average"))
-            median.data.add(parseStatPoint(data, "median"))
-            max.data.add(parseStatPoint(data, "max"))
-        }
-    }
-}
-
-class MetricsUI: Application() {
-
-
-    override fun start(stage: Stage) {
-        stage.title = "Metrics UI"
-
+    init {
         val xAxis = NumberAxis()
         xAxis.isAutoRanging = false
         xAxis.lowerBound = ceilTimeHour(DateTime.now().minusDays(1)).millis.toDouble()
@@ -96,34 +44,92 @@ class MetricsUI: Application() {
             override fun fromString(v: String) = 0
         }
 
-        val chart = LineChart<Number, Number>(xAxis, yAxis)
+        chart = LineChart<Number, Number>(xAxis, yAxis)
         chart.title = "Overall times"
 
-        val average = XYChart.Series<Number, Number>()
         average.name = "Average"
-
-        val median = XYChart.Series<Number, Number>()
         median.name = "Median"
-
-        val max = XYChart.Series<Number, Number>()
         max.name = "Max"
 
-        val result = search.prepareSearch("metrics").setTypes("stat").execute().actionGet()
-        result.hits.hits.forEach {
-            val data = it.source
-            average.data.add(parseStatPoint(data, "average"))
-            median.data.add(parseStatPoint(data, "median"))
-            max.data.add(parseStatPoint(data, "max"))
-        }
-
-        val scene = Scene(chart, 800.0, 600.0)
         chart.data.add(average)
         chart.data.add(median)
         chart.data.add(max)
+    }
+}
+
+class MetricsUI: Application() {
+    val context = runClient(1, true)
+    var server: BinaryClient? = null
+    var lastUpdate = DateTime(0)
+
+    val graph = StatGraph()
+
+    override fun start(stage: Stage) {
+        stage.title = "Metrics UI"
+
+        val scene = Scene(graph.chart, 800.0, 600.0)
 
         stage.scene = scene
         stage.show()
     }
+
+    fun connect() {
+        connectBinary(context, host, port, 10000) { c, e ->
+            Platform.runLater {
+                if(e == null) {
+                    server = c!!
+                    onConnect()
+                } else {
+                    onConnectError(e)
+                }
+            }
+        }
+    }
+
+    fun update() {
+        val server = server
+        if(server == null || !server.connected) return connect()
+
+        server.call(
+            routeHash("GET /stats/{from}/{to}"),
+            arrayOf(lastUpdate.millis, DateTime.now().millis),
+            arrayOf(password),
+            StatsPacket::class.java
+        ) { r, e ->
+            Platform.runLater {
+                if(e == null) {
+                    onUpdate(r!! as StatsPacket)
+                } else {
+                    onUpdateError(e)
+                }
+            }
+        }
+    }
+
+    fun onUpdate(packet: StatsPacket) {
+        packet.slices.lastOrNull()?.let {
+            lastUpdate = it.time
+        }
+
+        packet.slices.forEach {
+            graph.average.data.add(XYChart.Data<Number, Number>(it.time.millis, it.global.average))
+            graph.median.data.add(XYChart.Data<Number, Number>(it.time.millis, it.global.median))
+            graph.max.data.add(XYChart.Data<Number, Number>(it.time.millis, it.global.max))
+        }
+    }
+
+    fun onUpdateError(e: Throwable) {
+        println("update error: $e")
+    }
+
+    fun onConnectError(e: Throwable) {
+        println("connect error: $e")
+    }
+
+    fun onConnect() {
+        println("connected")
+        update()
+    }
 }
 
-fun main(args: Array<String>) = Application.launch(MetricsUI::class.java, *args)*/
+fun main(args: Array<String>) = Application.launch(MetricsUI::class.java, *args)

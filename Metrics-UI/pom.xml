@@ -51,13 +51,13 @@
     <dependencies>
         <dependency>
             <groupId>com.rimmer</groupId>
-            <artifactId>Metrics-Core</artifactId>
+            <artifactId>Metrics-Server</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
             <artifactId>Yttrium-Server</artifactId>
-            <version>44731e1b28b01871b194b2f7f039fd8825c5d544</version>
+            <version>9cb731237b7077c56f198639113233436f34c7a6</version>
         </dependency>
     </dependencies>
 </project>
