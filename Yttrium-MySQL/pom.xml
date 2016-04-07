@@ -76,7 +76,7 @@
         <dependency>
             <groupId>com.github.Le-Chiffre</groupId>
             <artifactId>MySQL-Async</artifactId>
-            <version>bcd013e66bb971e0d1a1d9f05a9863822aa204ba</version>
+            <version>0c02b046c6e96edd6209bffbe3f97b2edd464d89</version>
         </dependency>
     </dependencies>
 </project>
