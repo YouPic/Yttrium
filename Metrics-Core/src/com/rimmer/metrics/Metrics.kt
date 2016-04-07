@@ -29,7 +29,7 @@ class Metrics: MetricsWriter {
     }
 
     inner class Path {
-        var lastSend = System.nanoTime()
+        var lastSend = 0L
         val calls = ArrayList<Call>()
     }
 
@@ -69,7 +69,7 @@ class Metrics: MetricsWriter {
         }
 
         path.calls.add(call)
-        if(time - path.lastSend > 60000000000L) {
+        if((time - path.lastSend > 60000000000L) || (call.error && time - path.lastSend > 10000000000L)) {
             sendStats(path)
             path.calls.clear()
             path.lastSend = time
