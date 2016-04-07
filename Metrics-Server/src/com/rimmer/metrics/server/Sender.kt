@@ -20,7 +20,7 @@ class ServerSender(val context: ServerContext, val host: String, val port: Int =
     val errorRoute = routeHash("POST /error")
 
     var client: BinaryClient? = null
-    var lastTry = System.nanoTime()
+    var lastTry = 0L
 
     init {
         ensureClient()
