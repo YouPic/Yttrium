@@ -18,6 +18,11 @@ import com.rimmer.yttrium.server.runServer
 fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
     val router = Router(emptyList())
 
+    // Force the packet types to be initialized.
+    StatPacket.Companion
+    ErrorPacket.Companion
+    ProfilePacket.Companion
+
     router.post("statistic").arg("stat").handle {it: StatPacket ->
         store.onStat(it)
         finish()

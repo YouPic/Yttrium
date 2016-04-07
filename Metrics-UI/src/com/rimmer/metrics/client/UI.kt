@@ -14,9 +14,11 @@ import javafx.scene.chart.XYChart
 import javafx.stage.Stage
 import javafx.util.StringConverter
 import org.joda.time.DateTime
+import java.util.*
+import kotlin.concurrent.scheduleAtFixedRate
 
 val host = "127.0.0.1"
-val port = 1338
+val port = 1339
 val password = "mysecretpassword"
 
 fun ceilTimeHour(time: DateTime) = time.withTime((time.hourOfDay + 1) % 24, 0, 0, 0)
@@ -71,6 +73,10 @@ class MetricsUI: Application() {
 
         stage.scene = scene
         stage.show()
+
+        Timer().scheduleAtFixedRate(0, 5000) {
+            Platform.runLater {update()}
+        }
     }
 
     fun connect() {
@@ -90,6 +96,7 @@ class MetricsUI: Application() {
         val server = server
         if(server == null || !server.connected) return connect()
 
+        StatsPacket.Companion
         server.call(
             routeHash("GET /stats/{from}/{to}"),
             arrayOf(lastUpdate.millis, DateTime.now().millis),
@@ -107,6 +114,8 @@ class MetricsUI: Application() {
     }
 
     fun onUpdate(packet: StatsPacket) {
+        println("Received update: $packet")
+
         packet.slices.lastOrNull()?.let {
             lastUpdate = it.time
         }
