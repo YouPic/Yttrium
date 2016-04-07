@@ -19,7 +19,7 @@ val host = "127.0.0.1"
 val port = 1338
 val password = "mysecretpassword"
 
-fun ceilTimeHour(time: DateTime) = time.withTime(time.hourOfDay + 1, 0, 0, 0)
+fun ceilTimeHour(time: DateTime) = time.withTime((time.hourOfDay + 1) % 24, 0, 0, 0)
 
 class StatGraph {
     val chart: LineChart<Number, Number>
