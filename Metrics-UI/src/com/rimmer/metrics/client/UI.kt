@@ -11,6 +11,7 @@ import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormatter
 import java.net.InetAddress
 import java.util.*
+
 /*
 /** The ElasticSearch configuration. */
 val elasticCluster = System.getenv("ELASTIC_CLUSTER") ?: "bb4fc4f2225aaadaa61abd68ec38b820"
@@ -22,7 +23,7 @@ val elasticPassword = System.getenv("ELASTIC_PASSWORD") ?: "fgkf4h5ees"
 fun ceilTimeHour(time: DateTime) = time.withTime(time.hourOfDay + 1, 0, 0, 0)
 
 fun parseStatPoint(stat: Map<*, *>, point: String) = XYChart.Data<Number, Number>(
-        DateTime.parse(stat["time"] as String).millis, (stat["stat"] as Map<String, Number>)[point]
+    DateTime.parse(stat["time"] as String).millis, (stat["stat"] as Map<String, Number>)[point]
 )
 
 class MetricModel {

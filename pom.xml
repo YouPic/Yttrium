@@ -13,6 +13,7 @@
         <module>Metrics-ElasticSearch</module>
         <module>Metrics-Core</module>
         <module>Metrics-Server</module>
+        <module>Metrics-UI</module>
     </modules>
 
     <repositories>
@@ -36,7 +37,7 @@
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
             <artifactId>Yttrium-Core</artifactId>
-            <version>5c9ca416c3191828d6036ebff49f3053d740f91c</version>
+            <version>44731e1b28b01871b194b2f7f039fd8825c5d544</version>
         </dependency>
     </dependencies>
 
