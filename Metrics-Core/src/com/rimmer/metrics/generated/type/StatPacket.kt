@@ -91,7 +91,7 @@ data class StatPacket(
                     }
                     5 -> {
                         val length_intervals = buffer.readVarInt()
-                        val i_intervals = 0
+                        var i_intervals = 0
                         while(i_intervals < length_intervals) {
                             intervals.add(Interval.fromBinary(buffer))
                             i_intervals++

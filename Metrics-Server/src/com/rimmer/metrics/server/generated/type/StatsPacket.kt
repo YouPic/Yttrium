@@ -47,7 +47,7 @@ data class StatsPacket(
                     0 -> break@loop
                     1 -> {
                         val length_slices = buffer.readVarInt()
-                        val i_slices = 0
+                        var i_slices = 0
                         while(i_slices < length_slices) {
                             slices.add(StatSlice.fromBinary(buffer))
                             i_slices++

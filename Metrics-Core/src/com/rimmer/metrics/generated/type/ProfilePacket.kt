@@ -102,7 +102,7 @@ data class ProfilePacket(
                     }
                     6 -> {
                         val length_events = buffer.readVarInt()
-                        val i_events = 0
+                        var i_events = 0
                         while(i_events < length_events) {
                             events.add(Event.fromBinary(buffer))
                             i_events++
