@@ -241,10 +241,11 @@ fun removeOldPoints(time: DateTime, points: MutableList<Metric>) {
             path.statsBuilder = emptyList()
         }
     }
-    list.clear()
 }
 
 fun removeOldProfiles(time: DateTime, profiles: MutableList<Profile>) {
+    if(profiles.size < 2) return
+
     var i = profiles.size - 1
     while(i > 0 && !isOldPoint(time, profiles[i])) {
         i--
@@ -254,5 +255,4 @@ fun removeOldProfiles(time: DateTime, profiles: MutableList<Profile>) {
         it.profileBuilder.clear()
         it.profileBuilder.trimToSize()
     }
-    list.clear()
 }
