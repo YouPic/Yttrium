@@ -94,6 +94,7 @@ data class StatPacket(
                         val i_intervals = 0
                         while(i_intervals < length_intervals) {
                             intervals.add(Interval.fromBinary(buffer))
+                            i_intervals++
                         }
                     }
                 }

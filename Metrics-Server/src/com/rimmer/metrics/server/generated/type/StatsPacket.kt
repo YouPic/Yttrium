@@ -50,6 +50,7 @@ data class StatsPacket(
                         val i_slices = 0
                         while(i_slices < length_slices) {
                             slices.add(StatSlice.fromBinary(buffer))
+                            i_slices++
                         }
                     }
                 }

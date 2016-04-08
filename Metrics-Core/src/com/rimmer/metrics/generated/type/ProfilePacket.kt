@@ -105,6 +105,7 @@ data class ProfilePacket(
                         val i_events = 0
                         while(i_events < length_events) {
                             events.add(Event.fromBinary(buffer))
+                            i_events++
                         }
                     }
                 }
