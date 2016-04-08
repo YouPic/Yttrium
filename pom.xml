@@ -14,6 +14,7 @@
         <module>Metrics-Core</module>
         <module>Metrics-Server</module>
         <module>Metrics-UI</module>
+        <module>Metrics-Yttrium</module>
     </modules>
 
     <build>
@@ -56,11 +57,12 @@
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
             <artifactId>Yttrium-Core</artifactId>
-            <version>9cb731237b7077c56f198639113233436f34c7a6</version>
+            <version>${yttrium.version}</version>
         </dependency>
     </dependencies>
 
     <properties>
         <kotlin.version>1.0.0</kotlin.version>
+        <yttrium.version>dd470fa9d55fd0799ab5f898b2392645f401ed3b</yttrium.version>
     </properties>
 </project>

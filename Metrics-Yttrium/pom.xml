@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>Metrics-UI</artifactId>
+    <artifactId>Metrics-Yttrium</artifactId>
 
     <build>
         <sourceDirectory>${project.basedir}/src</sourceDirectory>
@@ -45,19 +45,43 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>2.4</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
     <dependencies>
         <dependency>
-            <groupId>com.rimmer</groupId>
-            <artifactId>Metrics-Server</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <groupId>com.github.Le-Chiffre.Yttrium</groupId>
+            <artifactId>Yttrium-Core</artifactId>
+            <version>${yttrium.version}</version>
         </dependency>
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
-            <artifactId>Yttrium-Server</artifactId>
+            <artifactId>Yttrium-MySQL</artifactId>
             <version>${yttrium.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.Le-Chiffre.Yttrium</groupId>
+            <artifactId>Yttrium-Router</artifactId>
+            <version>${yttrium.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.rimmer</groupId>
+            <artifactId>Metrics-Core</artifactId>
+            <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
 </project>

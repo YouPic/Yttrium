@@ -57,7 +57,7 @@
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
             <artifactId>Yttrium-Server</artifactId>
-            <version>44731e1b28b01871b194b2f7f039fd8825c5d544</version>
+            <version>${yttrium.version}</version>
         </dependency>
     </dependencies>
 </project>
