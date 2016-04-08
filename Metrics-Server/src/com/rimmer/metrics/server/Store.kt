@@ -96,22 +96,27 @@ class MetricStore {
             0
         } else {
             val index = inFlightTimes.binarySearch {it.time.millis.compareTo(from)}
-            if(index > 0) index else -index - 1
+            if(index > 0) index else -index
         }
 
         val last = if(inFlightTimes.last().time.millis < to) {
-            inFlightTimes.size - 1
+            inFlightTimes.size
         } else {
             val index = inFlightTimes.binarySearch {it.time.millis.compareTo(to)}
-            if(index > 0) index else -index - 1
+            if(index > 0) index + 1 else -index
         }
 
-        return StatsPacket(inFlightTimes.subList(first, last).map {
+        val list = inFlightTimes.subList(first, last)
+        println("Returning stats with ${list.size} slices.")
+
+        return StatsPacket(list.map {
             StatSlice(it.time, statEntry(it), it.paths.mapValues {statEntry(it.value)})
         })
     }
 
     @Synchronized fun onStat(packet: StatPacket) {
+        println("Received stat packet with ${packet.intervals.size} intervals.")
+
         // Remove the stats builder from any old in-flight points.
         removeOldPoints(packet.time, inFlightTimes)
 
@@ -163,6 +168,8 @@ class MetricStore {
     }
 
     @Synchronized fun onProfile(packet: ProfilePacket) {
+        println("Received profile packet with ${packet.events.size} events.")
+
         // Remove the profile builder from any old in-flight profiles.
         removeOldProfiles(packet.time, inFlightProfiles)
 
@@ -191,6 +198,8 @@ class MetricStore {
     }
 
     @Synchronized fun onError(packet: ErrorPacket) {
+        println("Received error packet.")
+
         val classes = errorMap.getOrPut(packet.path) { HashMap<String, ErrorClass>() }
         val type = classes.getOrPut(packet.cause) {ErrorClass(packet.cause, packet.trace)}
         type.count++

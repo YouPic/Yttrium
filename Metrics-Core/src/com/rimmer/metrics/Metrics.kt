@@ -140,15 +140,14 @@ class Metrics: MetricsWriter {
 
                 // We need to sort the calls on their duration to find the median and percentiles.
                 // In the same loop we calculate the average.
-                var totalTime = 0L
                 calls.sortBy {
                     val elapsed = it.endTime - it.startTime
-                    totalTime += elapsed
                     elapsed
                 }
 
-                if(calls.size == 1) {
-                    totalTime = calls[0].endTime - calls[0].startTime
+                var totalTime = 0L
+                for(c in calls) {
+                    totalTime += calls[0].endTime - calls[0].startTime
                 }
 
                 val median = calls[count / 2]
