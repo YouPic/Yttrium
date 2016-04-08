@@ -12,7 +12,6 @@
         <module>Core</module>
         <module>Server</module>
         <module>Yttrium-MySQL</module>
-        <module>Metrics</module>
     </modules>
 
     <repositories>
