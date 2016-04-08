@@ -228,6 +228,8 @@ fun mergeIntervals(first: List<Interval>, second: List<Interval>): List<Interval
 fun isOldPoint(time: DateTime, p: TimeSlice) = time.millis - p.time.millis > 60000
 
 fun removeOldPoints(time: DateTime, points: MutableList<Metric>) {
+    if(points.size < 2) return
+
     var i = points.size - 1
     while(i > 0 && !isOldPoint(time, points[i])) {
         i--
