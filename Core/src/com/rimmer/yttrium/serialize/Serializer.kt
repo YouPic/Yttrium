@@ -74,7 +74,20 @@ fun writeJson(value: Any?, target: ByteBuf) {
                 }
                 writer.endArray()
             }
-            else -> throw InvalidStateException("Value $value cannot be serialized.")
+            is Map<*, *> -> {
+                writer.startObject()
+                for(kv in value) {
+                    val k = kv.key
+                    when(k) {
+                        is String -> writer.field(k)
+                        is ByteArray -> writer.field(k)
+                        else -> throw IllegalArgumentException("JSON map keys must be String or ByteArray")
+                    }
+                    writeJson(kv.value, target)
+                }
+                writer.endObject()
+            }
+            else -> throw IllegalArgumentException("Value $value cannot be serialized.")
         }
     }
 }
@@ -105,7 +118,14 @@ fun writeBinary(value: Any?, target: ByteBuf) {
                 target.writeVarInt(value.size)
                 for(i in value) writeBinary(i, target)
             }
-            else -> throw InvalidStateException("Value $value cannot be serialized.")
+            is Map<*, *> -> {
+                target.writeVarInt(value.size)
+                for(kv in value) {
+                    writeBinary(kv.key, target)
+                    writeBinary(kv.value, target)
+                }
+            }
+            else -> throw IllegalArgumentException("Value $value cannot be serialized.")
         }
     }
 }
