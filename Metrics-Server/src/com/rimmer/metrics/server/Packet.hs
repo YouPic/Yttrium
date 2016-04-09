@@ -1,4 +1,5 @@
 
+-- Statistics data types.
 data StatEntry where
     median: Float
     average: Float
@@ -15,3 +16,26 @@ data StatSlice where
 
 data StatsPacket where
     slices: {StatSlice}
+
+-- Profiling data types.
+data Event where
+    group: String
+    event: String
+    startTime: Long
+    endTime: Long
+
+data ProfileEntry where
+    start: Long
+    end: Long
+    events: {Event}
+
+data ProfileStat where
+    normal: ProfileEntry
+    max: ProfileEntry
+
+data ProfileSlice where
+    time: Date
+    paths: {String -> ProfileStat}
+
+data ProfilesPacket where
+    slices: {ProfileSlice}
