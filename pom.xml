@@ -63,6 +63,6 @@
 
     <properties>
         <kotlin.version>1.0.0</kotlin.version>
-        <yttrium.version>dd470fa9d55fd0799ab5f898b2392645f401ed3b</yttrium.version>
+        <yttrium.version>16a6065f48243a9ef4710c7aab6e78026056da89</yttrium.version>
     </properties>
 </project>

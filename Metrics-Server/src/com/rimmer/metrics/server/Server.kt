@@ -50,5 +50,10 @@ fun clientServer(context: ServerContext, store: MetricStore, port: Int, password
         finished(store.getStats(from, to))
     }
 
+    router.get("profile/:from/:to").arg("password").handle {from: Long, to: Long, pw: String ->
+        if(pw != password) throw UnauthorizedException()
+        finished(store.getProfiles(from, to))
+    }
+
     listenBinary(context, port, null, BinaryRouter(router))
 }

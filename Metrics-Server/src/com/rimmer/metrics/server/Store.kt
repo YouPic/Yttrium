@@ -1,9 +1,8 @@
 package com.rimmer.metrics.server
 
 import com.rimmer.metrics.generated.type.*
-import com.rimmer.metrics.server.generated.type.StatEntry
-import com.rimmer.metrics.server.generated.type.StatSlice
-import com.rimmer.metrics.server.generated.type.StatsPacket
+import com.rimmer.metrics.generated.type.Event
+import com.rimmer.metrics.server.generated.type.*
 import org.joda.time.DateTime
 import java.util.*
 
@@ -53,10 +52,14 @@ class Metric(time: DateTime): TimeSlice(time) {
 
 class ProfilePoint(val server: String, val startTime: Long, val endTime: Long, val events: List<Event>)
 
-class Profile(val path: String, time: DateTime): TimeSlice(time) {
+class PathProfile {
     var normal: ProfilePoint? = null
     var max: ProfilePoint? = null
     val profileBuilder = ArrayList<ProfilePoint>()
+}
+
+class Profile(time: DateTime): TimeSlice(time) {
+    val paths = HashMap<String, PathProfile>()
 }
 
 fun statEntry(it: Metric) = StatEntry(
@@ -78,6 +81,12 @@ fun statEntry(it: PathMetric) = StatEntry(
     it.min.toFloat(),
     it.totalCalls
 )
+
+fun profileEntry(it: ProfilePoint?) = ProfileEntry(it?.startTime ?: 0, it?.endTime ?: 0, it?.events?.map {
+    com.rimmer.metrics.server.generated.type.Event(it.event.name, it.type, it.startTime, it.endTime)
+} ?: emptyList())
+
+fun profileStat(it: PathProfile) = ProfileStat(profileEntry(it.normal), profileEntry(it.max))
 
 class MetricStore {
     val inFlightTimes = ArrayList<Metric>()
@@ -111,6 +120,33 @@ class MetricStore {
 
         return StatsPacket(list.map {
             StatSlice(it.time, statEntry(it), it.paths.mapValues {statEntry(it.value)})
+        })
+    }
+
+    @Synchronized fun getProfiles(from: Long, to: Long): ProfilesPacket {
+        if(inFlightProfiles.isEmpty()) {
+            return ProfilesPacket(emptyList())
+        }
+
+        val first = if(inFlightProfiles.first().time.millis >= from) {
+            0
+        } else {
+            val index = inFlightProfiles.binarySearch {it.time.millis.compareTo(from)}
+            if(index > 0) index else -index
+        }
+
+        val last = if(inFlightProfiles.last().time.millis < to) {
+            inFlightProfiles.size
+        } else {
+            val index = inFlightProfiles.binarySearch {it.time.millis.compareTo(to)}
+            if(index > 0) index + 1 else -index
+        }
+
+        val list = inFlightProfiles.subList(first, last)
+        println("Returning stats with ${list.size} slices.")
+
+        return ProfilesPacket(list.map {
+            ProfileSlice(it.time, it.paths.mapValues {profileStat(it.value)})
         })
     }
 
@@ -181,20 +217,27 @@ class MetricStore {
                 inFlightProfiles.subList(0, inFlightProfiles.size - 24*60).clear()
             }
 
-            val p = Profile(packet.path, DateTime(key * 60000))
+            val p = Profile(DateTime(key * 60000))
             profileMap.put(key, p)
             inFlightProfiles.add(p)
             p
         } else existing
 
+        val existingPath = profile.paths[packet.path]
+        val path = if(existingPath === null) {
+            val p = PathProfile()
+            profile.paths[packet.path] = p
+            p
+        } else existingPath
+
         // Keep the profile list sorted by duration.
         val duration = packet.end - packet.start
         var insertIndex = 0
-        profile.profileBuilder.find {insertIndex++; (it.endTime - it.startTime) > duration}
-        profile.profileBuilder.add(insertIndex - 1, ProfilePoint(packet.server, packet.start, packet.end, packet.events))
+        path.profileBuilder.find {insertIndex++; (it.endTime - it.startTime) > duration}
+        path.profileBuilder.add(insertIndex - 1, ProfilePoint(packet.server, packet.start, packet.end, packet.events))
 
-        profile.normal = profile.profileBuilder[profile.profileBuilder.size / 2]
-        profile.max = profile.profileBuilder[profile.profileBuilder.size - 1]
+        path.normal = path.profileBuilder[path.profileBuilder.size / 2]
+        path.max = path.profileBuilder[path.profileBuilder.size - 1]
     }
 
     @Synchronized fun onError(packet: ErrorPacket) {
@@ -261,7 +304,9 @@ fun removeOldProfiles(time: DateTime, profiles: MutableList<Profile>) {
     }
     val list = profiles.subList(0, i)
     list.forEach {
-        it.profileBuilder.clear()
-        it.profileBuilder.trimToSize()
+        it.paths.forEach { p, path ->
+            path.profileBuilder.clear()
+            path.profileBuilder.trimToSize()
+        }
     }
 }
