@@ -27,7 +27,11 @@ inline fun <T> Query.maybeValue(pool: SQLPool, context: Context, crossinline for
     val future = Task<T?>()
     run(pool[context], context.id) { r, e ->
         if(e == null) {
-            future.finish(r?.result?.data?.elementAtOrNull(0)?.let { format(it) })
+            try {
+                future.finish(r?.result?.data?.elementAtOrNull(0)?.let {format(it)})
+            } catch(e: Throwable) {
+                future.fail(e)
+            }
         } else {
             future.fail(e)
         }
@@ -52,7 +56,11 @@ inline fun <T> Query.valueOrElse(pool: SQLPool, context: Context, crossinline fo
                     }
                 }
             } else {
-                future.finish(format(result.data[0]))
+                try {
+                    future.finish(format(result.data[0]))
+                } catch(e: Throwable) {
+                    future.fail(e)
+                }
             }
         } else {
             future.fail(e)
@@ -113,13 +121,17 @@ inline fun <T> Query.then(pool: SQLPool, context: Context, crossinline f: (Query
     val task = Task<T>()
     run(pool[context], context.id) {r, e ->
         if(e == null) {
-            val next = f(r!!)
-            next.handler = {r, e ->
-                if(e == null) {
-                    task.finish(r!!)
-                } else {
-                    task.fail(e)
+            try {
+                val next = f(r!!)
+                next.handler = {r, e ->
+                    if (e == null) {
+                        task.finish(r!!)
+                    } else {
+                        task.fail(e)
+                    }
                 }
+            } catch(e: Throwable) {
+                task.fail(e)
             }
         } else {
             task.fail(e)
