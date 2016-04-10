@@ -24,7 +24,7 @@ class JsonToken(val buffer: ByteBuf) {
 
     fun expect(type: Type, allowNull: Boolean = false) {
         parse()
-        if(this.type != type || (allowNull && this.type != Type.NullLit)) {
+        if(this.type != type || (this.type == Type.NullLit && !allowNull)) {
             throw InvalidStateException("Invalid json: Expected $type")
         }
     }
