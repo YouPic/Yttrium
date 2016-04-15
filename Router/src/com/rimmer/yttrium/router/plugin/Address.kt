@@ -18,8 +18,7 @@ class AddressPlugin: Plugin<Int> {
     }
 
     override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {
-        val ip = (route.channel.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
-        arguments[context] = IPAddress(ip)
+        arguments[context] = IPAddress(route.sourceIp)
         f(null)
     }
 }

@@ -4,6 +4,7 @@ import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
+import io.netty.handler.codec.http.FullHttpRequest
 
 /** The supported http call methods. */
 enum class HttpMethod {GET, POST, DELETE, PUT}
@@ -124,6 +125,7 @@ interface RouteListener {
 /**
  * Context information that is sent to route handlers.
  * @param channel The channel this route is being executed for.
+ * @param sourceIp The source ip this request originated from. This may be different from the channel ip.
  * @param eventLoop The current event loop.
  * @param route The route being executed.
  * @param pathParameters The path parameters that were sent to the route.
@@ -132,6 +134,7 @@ interface RouteListener {
  */
 class RouteContext(
     val channel: ChannelHandlerContext,
+    val sourceIp: String,
     eventLoop: EventLoop,
     val route: Route,
     val pathParameters: Array<Any?>,

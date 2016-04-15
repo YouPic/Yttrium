@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.multipart.HttpData
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder
 import io.netty.util.AsciiString
+import java.net.InetSocketAddress
 import java.util.*
 
 val jsonContentType = AsciiString("application/json")
@@ -31,6 +32,8 @@ class HttpRouter(
         // Check if the request contains a version request.
         val versionString = request.headers().get("API-VERSION") ?: "0"
         val version = parseInt(versionString, 0)
+        val remote = request.headers().get("X-Forwarded-For") ?:
+            (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
 
         // Check if the requested http method is known.
         val method = convertMethod(request.method())
@@ -80,10 +83,10 @@ class HttpRouter(
                 override fun onFail(route: RouteContext, reason: Throwable?) { fail(route, reason) }
             }
 
-            route.handler(RouteContext(context, eventLoop, route, params, queries, callId), listener)
+            route.handler(RouteContext(context, remote, eventLoop, route, params, queries, callId), listener)
         } catch(e: Throwable) {
             // We don't have the call parameters here, so we just send a route context without them.
-            fail(RouteContext(context, eventLoop, route, emptyArray(), emptyArray(), callId), e)
+            fail(RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callId), e)
         }
     }
 }

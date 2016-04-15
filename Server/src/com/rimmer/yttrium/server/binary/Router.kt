@@ -11,6 +11,7 @@ import com.rimmer.yttrium.serialize.*
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
+import java.net.InetSocketAddress
 
 enum class ResponseCode {
     Success, NoRoute, NotFound, InvalidArgs, NoPermission, InternalError
@@ -26,6 +27,7 @@ class BinaryRouter(
     private val segmentMap = router.routes.associateBy { routeHash(it) }
 
     override fun invoke(context: ChannelHandlerContext, source: ByteBuf, target: ByteBuf, f: () -> Unit) {
+        val remote = (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
         val id = source.readVarInt()
         val route = segmentMap[id]
         if(route == null) {
@@ -84,7 +86,7 @@ class BinaryRouter(
             }
 
             // Run the route handler.
-            val routeContext = RouteContext(context, eventLoop, route, params, queries, callId)
+            val routeContext = RouteContext(context, remote, eventLoop, route, params, queries, callId)
             try {
                 route.handler(routeContext, listener)
             } catch(e: Throwable) {
@@ -96,7 +98,7 @@ class BinaryRouter(
             mapError(error, target, f)
 
             // We don't have the call parameters here, so we just send a route context without them.
-            listener?.onFail(RouteContext(context, eventLoop, route, emptyArray(), emptyArray(), callId), error)
+            listener?.onFail(RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callId), error)
         }
     }
 
