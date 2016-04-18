@@ -194,7 +194,8 @@ private fun parseParameters(route: Route, parameters: Iterable<String>): Array<A
     val array = arrayOfNulls<Any>(length)
     parameters.forEachIndexed { i, p ->
         val index = length - i - 1
-        array[index] = readPrimitive(p, route.typedSegments[index].type!!)
+        val string = URLDecoder.decode(p, "UTF-8")
+        array[index] = readPrimitive(string, route.typedSegments[index].type!!)
     }
     return array
 }
