@@ -15,6 +15,7 @@ import io.netty.handler.codec.http.multipart.HttpData
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder
 import io.netty.util.AsciiString
 import java.net.InetSocketAddress
+import java.net.URLDecoder
 import java.util.*
 
 val jsonContentType = AsciiString("application/json")
@@ -222,7 +223,8 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             val name = q.sliceHash(0, separator)
             params.forEachIndexed { i, query ->
                 if(query.hash == name) {
-                    values[i] = readPrimitive(q.substring(separator + 1), query.type)
+                    val string = URLDecoder.decode(q.substring(separator + 1), "UTF-8")
+                    values[i] = readPrimitive(string, query.type)
                 }
             }
         }
