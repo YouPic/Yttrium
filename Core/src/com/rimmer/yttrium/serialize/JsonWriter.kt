@@ -1,5 +1,8 @@
 package com.rimmer.yttrium.serialize
 
+import com.rimmer.yttrium.ByteString
+import com.rimmer.yttrium.ByteStringBuilder
+import com.rimmer.yttrium.utf8
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
 
@@ -85,6 +88,36 @@ class JsonWriter(val buffer: ByteBuf) {
             }
         }
         buffer.writeBytes(escaped.toString().toByteArray())
+        buffer.writeByte('"'.toInt())
+        return this
+    }
+
+    fun value(s: ByteString): JsonWriter {
+        buffer.writeByte('"'.toInt())
+        val escaped = ByteStringBuilder(s.size)
+        for(c in s) {
+            if(c == '"'.toByte()) {
+                escaped.append("\\\"".utf8)
+            } else if(c == '\\'.toByte()) {
+                escaped.append("\\\\".utf8)
+            } else if(c < 0x20.toByte()) {
+                if (c == '\b'.toByte()) {
+                    escaped.append("\\b".utf8)
+                } else if (c == 0x0C.toByte()) {
+                    escaped.append("\\f".utf8)
+                } else if (c == '\n'.toByte()) {
+                    escaped.append("\\n".utf8)
+                } else if (c == '\r'.toByte()) {
+                    escaped.append("\\r".utf8)
+                } else if (c == '\t'.toByte()) {
+                    escaped.append("\\t".utf8)
+                }
+            } else {
+                escaped.append(c)
+            }
+        }
+
+        escaped.string.write(buffer)
         buffer.writeByte('"'.toInt())
         return this
     }
