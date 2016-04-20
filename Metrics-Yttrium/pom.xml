@@ -69,9 +69,9 @@
             <version>${yttrium.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.github.Le-Chiffre.Yttrium</groupId>
-            <artifactId>Yttrium-MySQL</artifactId>
-            <version>${yttrium.version}</version>
+            <groupId>com.github.Le-Chiffre</groupId>
+            <artifactId>MySQL-Async</artifactId>
+            <version>6ccf2a2ec1ef4b8d5a1fbe5869a98670cab0ef21</version>
         </dependency>
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
