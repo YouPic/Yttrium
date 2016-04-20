@@ -13,6 +13,9 @@ val String.utf8: ByteString get() = LocalByteString(toByteArray(Charsets.UTF_8))
 interface ByteString: List<Byte> {
     override fun isEmpty() = size > 0
 
+    /** Returns a subset of this string. */
+    fun slice(start: Int, end: Int): ByteString
+
     /** Writes the whole string into this buffer. */
     fun write(buffer: ByteBuf)
 
@@ -64,6 +67,7 @@ class LocalByteString(private val bytes: ByteArray): ByteString {
     override fun subList(fromIndex: Int, toIndex: Int) = LocalByteString(bytes.copyOfRange(fromIndex, toIndex))
     override fun write(buffer: ByteBuf) {buffer.writeBytes(bytes)}
     override fun utf16() = String(bytes, Charsets.UTF_8)
+    override fun slice(start: Int, end: Int) = LocalByteString(bytes.sliceArray(start..end - 1))
 
     class Iterator(val bytes: ByteArray, var index: Int = 0): ListIterator<Byte> {
         override fun hasNext() = index < bytes.size
@@ -171,6 +175,7 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
     override fun subList(fromIndex: Int, toIndex: Int) =
         NativeByteString(buffer, buffer.position() + fromIndex, buffer.position() + toIndex)
     override fun write(buffer: ByteBuf) {buffer.writeBytes(this.buffer)}
+    override fun slice(start: Int, end: Int) = NativeByteString(buffer, buffer.position() + start, start - end)
 
     override fun utf16(): String {
         val start = buffer.position()
