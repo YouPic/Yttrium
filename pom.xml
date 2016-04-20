@@ -11,7 +11,6 @@
         <module>Router</module>
         <module>Core</module>
         <module>Server</module>
-        <module>Yttrium-MySQL</module>
     </modules>
 
     <repositories>
