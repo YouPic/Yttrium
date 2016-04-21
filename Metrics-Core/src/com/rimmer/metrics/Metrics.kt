@@ -18,7 +18,7 @@ interface MetricsWriter {
     fun onEvent(call: Int, eventType: EventType, type: String, elapsedNanos: Long)
 }
 
-class Metrics: MetricsWriter {
+class Metrics(val serverName: String = "0"): MetricsWriter {
     inner class Call(val path: String, val startDate: DateTime, val startTime: Long, val parameters: Map<String, String>) {
         val events = ArrayList<Event>()
         var endTime = startTime
@@ -138,7 +138,7 @@ class Metrics: MetricsWriter {
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
                 path.calls.filterTo(calls) {
-                    if (it.error) {
+                    if(it.error) {
                         sendError(ErrorPacket(it.path, it.startDate, it.failReason, it.failTrace))
                     }
                     !it.failed
@@ -167,11 +167,17 @@ class Metrics: MetricsWriter {
                 val max = calls[count - 1]
 
                 // Send the timing intervals for calculating statistics.
-                sendStatistic(StatPacket(min.path, "", date, totalTime, calls.map { Interval(it.startTime, it.endTime) }.toCollection(ArrayList())))
+                sendStatistic(StatPacket(
+                    min.path,
+                    serverName,
+                    date,
+                    totalTime,
+                    calls.map { Interval(it.startTime, it.endTime) }.toCollection(ArrayList())
+                ))
 
                 // Send a full profile for the median and maximum values.
-                sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
-                sendProfile(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
+                sendProfile(ProfilePacket(median.path, serverName, median.startDate, median.startTime, median.endTime, median.events))
+                sendProfile(ProfilePacket(max.path, serverName, max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
