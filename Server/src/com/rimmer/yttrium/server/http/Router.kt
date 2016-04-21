@@ -4,6 +4,7 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.parseInt
 import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
+import com.rimmer.yttrium.serialize.JsonToken
 import com.rimmer.yttrium.serialize.readJson
 import com.rimmer.yttrium.serialize.readPrimitive
 import com.rimmer.yttrium.serialize.writeJson
@@ -63,7 +64,11 @@ class HttpRouter(
             val queries = parseQuery(route, request.uri())
 
             // Parse any parameters that were provided through the request body.
-            parseBodyQuery(route, request, queries)
+            if(request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
+                parseJsonBody(route, request, queries)
+            } else {
+                parseBodyQuery(route, request, queries)
+            }
 
             // Make sure all required parameters were provided, and handle optional ones.
             checkQueries(route, queries)
@@ -257,6 +262,30 @@ fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>)
                         queries[i] = readPrimitive(buffer.toString(Charsets.UTF_8), query.type)
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Parses query parameters from a json body. */
+fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>) {
+    val buffer = request.content()
+    if(buffer.isReadable) {
+        val json = JsonToken(buffer)
+        json.expect(JsonToken.Type.StartObject)
+        while(true) {
+            json.parse()
+            if(json.type == JsonToken.Type.EndObject) {
+                break
+            } else if(json.type == JsonToken.Type.FieldName) {
+                val name = json.stringPayload.hashCode()
+                route.queries.forEachIndexed { i, query ->
+                    if(query.hash == name) {
+                        queries[i] = readJson(buffer, query.type)
+                    }
+                }
+            } else {
+                throw InvalidStateException("Expected json field name before offset ${request.content().readerIndex()}")
             }
         }
     }
