@@ -21,6 +21,7 @@ class ByteStringBuilder {
     val length: Int get() = count
     val string: ByteString get() = LocalByteString(value)
     val capacity: Int get() = value.size
+    val buffer: ByteArray get() = value
 
     fun ensureCapacity(minimumCapacity: Int) {
         if(minimumCapacity > 0 && minimumCapacity - value.size > 0) {

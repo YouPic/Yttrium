@@ -7,7 +7,7 @@ import java.nio.ByteBuffer
  * Helper functions for handling UTF-8 strings.
  */
 
-val emptyString = LocalByteString(ByteArray(0))
+val emptyString: ByteString = LocalByteString(ByteArray(0))
 val String.utf8: ByteString get() = LocalByteString(toByteArray(Charsets.UTF_8))
 
 interface ByteString: List<Byte> {

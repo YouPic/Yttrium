@@ -21,13 +21,13 @@ interface Writable {
  * This is a special wrapper around String,
  * which when stored will contain the raw string instead of being serialized to json.
  */
-data class RawString(val value: ByteString): Writable {
+data class RawString(val value: String): Writable {
     override fun encodeJson(buffer: ByteBuf) {
-        value.write(buffer)
+        buffer.writeBytes(value.toByteArray())
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeByteString(value)
+        buffer.writeString(value)
     }
 
     companion object {
@@ -35,9 +35,9 @@ data class RawString(val value: ByteString): Writable {
             registerReadable(RawString::class.java, {
                 val bytes = ByteArray(it.readableBytes())
                 it.readBytes(bytes)
-                RawString(LocalByteString(bytes))
+                RawString(String(bytes))
             }, {
-                RawString(it.readByteString())
+                RawString(it.readString())
             })
         }
     }
@@ -143,10 +143,10 @@ fun readPrimitive(source: String, target: Class<*>): Any {
         return maybeParseInt(source) ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
     } else if(target == Long::class.javaObjectType || target == Long::class.javaPrimitiveType) {
         return maybeParseLong(source) ?: throw InvalidStateException("\"$source\" cannot be parsed as an integer")
-    } else if(target == ByteString::class.java) {
-        return source.utf8
     } else if(target == String::class.java) {
         return source
+    } else if(target == ByteString::class.java) {
+        return source.utf8
     } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
         return Unit
     } else if(target == DateTime::class.java) {
@@ -196,7 +196,7 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
     if(readable != null) {
         return readable.fromJson(buffer)
     } else {
-        val reader = JsonToken(buffer)
+        val reader = JsonToken(buffer, useByteString = target == ByteString::class.java)
         if(target == Int::class.javaObjectType || target == Int::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.NumberLit)
             return reader.numberPayload.toInt()
@@ -205,10 +205,10 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
             return reader.numberPayload.toLong()
         } else if(target == ByteString::class.java) {
             reader.expect(JsonToken.Type.StringLit)
-            return reader.stringPayload
+            return reader.byteStringPayload
         } else if(target == String::class.java) {
             reader.expect(JsonToken.Type.StringLit)
-            return reader.stringPayload.utf16()
+            return reader.stringPayload
         } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.StartObject)
             reader.expect(JsonToken.Type.EndObject)
@@ -218,14 +218,14 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
             if(reader.type == JsonToken.Type.NumberLit) {
                 return DateTime(reader.numberPayload.toLong())
             } else if(reader.type == JsonToken.Type.StringLit) {
-                return DateTime.parse(reader.stringPayload.utf16())
+                return DateTime.parse(reader.stringPayload)
             } else {
                 throw InvalidStateException("Expected a json date.")
             }
         } else if(target.isEnum) {
             reader.expect(JsonToken.Type.StringLit)
             return (target as Class<Enum<*>>).enumConstants.find {
-                it.name.utf8 == reader.stringPayload
+                it.name == reader.stringPayload
             } ?: throw InvalidStateException("Expected instance of enum $target")
         } else if(target == Boolean::class.javaObjectType || target == Boolean::class.javaPrimitiveType) {
             reader.expect(JsonToken.Type.BoolLit)

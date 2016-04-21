@@ -1,13 +1,12 @@
 package com.rimmer.yttrium.serialize
 
-import com.rimmer.yttrium.ByteString
 import com.rimmer.yttrium.ByteStringBuilder
 import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.emptyString
 import io.netty.buffer.ByteBuf
 
 /** Represents a json token with parsing functionality. */
-class JsonToken(val buffer: ByteBuf) {
+class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
     enum class Type {
         StartObject,
         EndObject,
@@ -23,7 +22,8 @@ class JsonToken(val buffer: ByteBuf) {
     var type = Type.StartObject
     var boolPayload = false
     var numberPayload = 0.0
-    var stringPayload: ByteString = emptyString
+    var stringPayload = ""
+    var byteStringPayload = emptyString
 
     fun expect(type: Type, allowNull: Boolean = false) {
         parse()
@@ -44,7 +44,7 @@ class JsonToken(val buffer: ByteBuf) {
         } else if(b == '}'.toInt()) {
             type = Type.EndObject
         } else {
-            parseValue(b.toByte())
+            parseValue(b.toChar())
         }
     }
 
@@ -52,11 +52,11 @@ class JsonToken(val buffer: ByteBuf) {
         return buffer.getByte(buffer.readerIndex()).toChar() == ']'
     }
 
-    private fun parseValue(first: Byte) {
-        if(first == '"'.toByte()) {
-            stringPayload = parseString()
-            val f = buffer.getByte(buffer.readerIndex())
-            if(f == ':'.toByte()) {
+    private fun parseValue(first: Char) {
+        if(first == '"') {
+            parseString()
+            val f = if(buffer.isReadable) buffer.getByte(buffer.readerIndex()) else 0
+            if(f.toChar() == ':') {
                 type = Type.FieldName
                 buffer.skipBytes(1)
             } else {
@@ -65,68 +65,70 @@ class JsonToken(val buffer: ByteBuf) {
         } else if(isDigit(first)) {
             type = Type.NumberLit
             numberPayload = parseFloat(first)
-        } else if(first == 't'.toByte()) {
-            expectChar('r'.toByte())
-            expectChar('u'.toByte())
-            expectChar('e'.toByte())
+        } else if(first == 't') {
+            expectChar('r')
+            expectChar('u')
+            expectChar('e')
             type = Type.BoolLit
             boolPayload = true
-        } else if(first == 'f'.toByte()) {
-            expectChar('a'.toByte())
-            expectChar('l'.toByte())
-            expectChar('s'.toByte())
-            expectChar('e'.toByte())
+        } else if(first == 'f') {
+            expectChar('a')
+            expectChar('l')
+            expectChar('s')
+            expectChar('e')
             type = Type.BoolLit
             boolPayload = false
-        } else if(first == 'n'.toByte()) {
-            expectChar('u'.toByte())
-            expectChar('l'.toByte())
-            expectChar('l'.toByte())
+        } else if(first == 'n') {
+            expectChar('u')
+            expectChar('l')
+            expectChar('l')
             type = Type.NullLit
         } else {
             throw InvalidStateException("Invalid json: expected a value")
         }
 
-        val c = buffer.getByte(buffer.readerIndex())
-        if(c == ','.toByte()) {
-            buffer.skipBytes(1)
+        if(buffer.isReadable) {
+            val c = buffer.getByte(buffer.readerIndex()).toChar()
+            if (c == ',') {
+                buffer.skipBytes(1)
+            }
         }
     }
 
-    private fun parseFloat(first: Byte): Double {
+    private fun parseFloat(first: Char): Double {
         var ch = first
         var out = 0.0
 
         // Check sign.
         var neg = false
-        if(ch == '+'.toByte()) {
-            ch = buffer.readByte()
-        } else if(ch == '-'.toByte()) {
-            ch = buffer.readByte()
+        if(ch == '+') {
+            ch = buffer.readByte().toChar()
+        } else if(ch == '-') {
+            ch = buffer.readByte().toChar()
             neg = true
         }
 
         // Create part before decimal point.
         while(isDigit(ch)) {
-            val n = Character.digit(ch.toChar(), 10)
+            val n = Character.digit(ch, 10)
             out *= 10.0
             out += n
-            ch = buffer.readByte()
+            ch = buffer.readByte().toChar()
         }
 
         // Check if there is a fractional part.
-        if(ch == '.'.toByte()) {
-            ch = buffer.readByte()
+        if(ch == '.') {
+            ch = buffer.readByte().toChar()
             var dec = 0.0
             var dpl = 0
 
             while(isDigit(ch)) {
-                val n = Character.digit(ch.toChar(), 10)
+                val n = Character.digit(ch, 10)
                 dec *= 10.0
                 dec += n
 
                 dpl++
-                ch = buffer.readByte()
+                ch = buffer.readByte().toChar()
             }
 
             // We need to use a floating point power here in order to support more than 9 decimals.
@@ -136,26 +138,26 @@ class JsonToken(val buffer: ByteBuf) {
         }
 
         // Check if there is an exponent.
-        if(ch == 'E'.toByte() || ch == 'e'.toByte()) {
-            ch = buffer.readByte()
+        if(ch == 'E' || ch == 'e') {
+            ch = buffer.readByte().toChar()
 
             // Check sign.
             var signNegative = false
-            if(ch == '+'.toByte()) {
-                ch = buffer.readByte()
-            } else if(ch == '-'.toByte()) {
-                ch = buffer.readByte()
+            if(ch == '+') {
+                ch = buffer.readByte().toChar()
+            } else if(ch == '-') {
+                ch = buffer.readByte().toChar()
                 signNegative = true
             }
 
             // Has exp. part;
             var exp = 0.0
 
-            while(Character.isDigit(ch.toChar())) {
-                val n = Character.digit(ch.toChar(), 10)
+            while(Character.isDigit(ch)) {
+                val n = Character.digit(ch, 10)
                 exp *= 10.0
                 exp += n
-                ch = buffer.readByte()
+                ch = buffer.readByte().toChar()
             }
 
             if(signNegative) exp = -exp;
@@ -169,7 +171,7 @@ class JsonToken(val buffer: ByteBuf) {
         return out
     }
 
-    private fun parseString(): ByteString {
+    private fun parseString() {
         val string = ByteStringBuilder()
         while(true) {
             val b = buffer.readByte().toInt()
@@ -178,10 +180,15 @@ class JsonToken(val buffer: ByteBuf) {
             } else if(b == '\\'.toInt()) {
                 parseEscaped(string)
             } else {
-                string.append(b)
+                string.append(b.toByte())
             }
         }
-        return string.string
+
+        if(useByteString) {
+            byteStringPayload = string.string
+        } else {
+            stringPayload = String(string.buffer, 0, string.length, Charsets.UTF_8)
+        }
     }
 
     private fun parseEscaped(string: ByteStringBuilder) {
@@ -217,7 +224,7 @@ class JsonToken(val buffer: ByteBuf) {
     }
 
     private fun skipWhitespace() {
-        while(true) {
+        while(buffer.isReadable) {
             val b = buffer.getByte(buffer.readerIndex()).toInt()
             if(b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0D) {
                 buffer.skipBytes(1)
@@ -227,8 +234,8 @@ class JsonToken(val buffer: ByteBuf) {
         }
     }
 
-    private fun expectChar(c: Byte) {
-        val ch = buffer.readByte()
+    private fun expectChar(c: Char) {
+        val ch = buffer.readByte().toChar()
         if(ch != c) {
             throw InvalidStateException("Invalid json: expected '$c'")
         }
@@ -271,8 +278,8 @@ val parseHexitLookup = arrayOf(
 /**
  * Returns true if this is a digit.
  */
-fun isDigit(c: Byte): Boolean {
+fun isDigit(c: Char): Boolean {
     val ch = c
-    val index = ch - '0'.toByte()
+    val index = ch - '0'
     return index <= 9 && index >= 0
 }
