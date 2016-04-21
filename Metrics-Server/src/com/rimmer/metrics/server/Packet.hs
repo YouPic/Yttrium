@@ -39,3 +39,13 @@ data ProfileSlice where
 
 data ProfilesPacket where
     slices: {ProfileSlice}
+
+data Error where
+    path: String
+    latest: Date
+    count: Int
+    cause: String
+    trace: String
+
+data ErrorPacket where
+    errors: {Error}
