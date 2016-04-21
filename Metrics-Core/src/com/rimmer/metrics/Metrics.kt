@@ -30,6 +30,7 @@ class Metrics: MetricsWriter {
 
     inner class Path {
         var lastSend = 0L
+        var counter = 0
         val calls = ArrayList<Call>()
     }
 
@@ -68,7 +69,18 @@ class Metrics: MetricsWriter {
             paths.put(call.path, path)
         }
 
-        path.calls.add(call)
+        val count = path.calls.size
+        if(count < 20) {
+            path.calls.add(call)
+        } else {
+            val stride = if(count < 100) 5 else if(count < 1000) 20 else 1000
+            if(path.counter == 0) {
+                path.calls.add(call)
+                path.counter++
+                if(path.counter > stride) path.counter = 0
+            }
+        }
+
         if((time - path.lastSend > 60000000000L) || (call.error && time - path.lastSend > 10000000000L)) {
             sendStats(path)
             path.calls.clear()
