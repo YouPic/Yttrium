@@ -76,9 +76,9 @@ class Metrics(val serverName: String = "0"): MetricsWriter {
             val stride = if(count < 100) 5 else if(count < 1000) 20 else 1000
             if(path.counter == 0) {
                 path.calls.add(call)
-                path.counter++
-                if(path.counter > stride) path.counter = 0
             }
+            path.counter++
+            if(path.counter > stride) path.counter = 0
         }
 
         if((time - path.lastSend > 60000000000L) || (call.error && time - path.lastSend > 10000000000L)) {
