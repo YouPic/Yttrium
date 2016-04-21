@@ -1,8 +1,10 @@
 package com.rimmer.metrics.server
 
 import com.rimmer.metrics.generated.type.*
+import com.rimmer.metrics.generated.type.ErrorPacket
 import com.rimmer.metrics.generated.type.Event
 import com.rimmer.metrics.server.generated.type.*
+import com.rimmer.metrics.server.generated.type.ErrorPacket as ClientError
 import org.joda.time.DateTime
 import java.util.*
 
@@ -148,6 +150,13 @@ class MetricStore {
         return ProfilesPacket(list.map {
             ProfileSlice(it.time, it.paths.mapValues {profileStat(it.value)})
         })
+    }
+
+    @Synchronized fun getErrors(from: Long): ClientError {
+        val errors = errorMap.mapValues {it.value.filterValues {it.lastOccurrence.millis > from}}
+        return ClientError(errors.flatMap { it.value.map {
+            Error(it.key, it.value.lastOccurrence, it.value.count, it.value.cause, it.value.trace)
+        }})
     }
 
     @Synchronized fun onStat(packet: StatPacket) {

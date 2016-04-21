@@ -32,7 +32,7 @@ class StatGraph {
     init {
         val xAxis = NumberAxis()
         xAxis.isAutoRanging = false
-        xAxis.lowerBound = ceilTimeHour(DateTime.now().minusDays(1)).millis.toDouble()
+        xAxis.lowerBound = ceilTimeHour(DateTime.now().minusHours(2)).millis.toDouble()
         xAxis.upperBound = ceilTimeHour(DateTime.now()).millis.toDouble()
         xAxis.tickUnit = 3600000.0
         xAxis.tickLabelFormatter = object: StringConverter<Number>() {
@@ -99,7 +99,7 @@ class MetricsUI: Application() {
         StatsPacket.Companion
         server.call(
             routeHash("GET /stats/{from}/{to}"),
-            arrayOf(lastUpdate.millis, DateTime.now().millis),
+            arrayOf(lastUpdate.millis + 1, DateTime.now().millis),
             arrayOf(password),
             StatsPacket::class.java
         ) { r, e ->
