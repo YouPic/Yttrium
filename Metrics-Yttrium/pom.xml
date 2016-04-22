@@ -71,7 +71,7 @@
         <dependency>
             <groupId>com.github.Le-Chiffre</groupId>
             <artifactId>MySQL-Async</artifactId>
-            <version>5b937e80139c7265c440fe6cf202e0fa051ab8a1</version>
+            <version>-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.github.Le-Chiffre.Yttrium</groupId>
