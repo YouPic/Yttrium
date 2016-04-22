@@ -168,6 +168,8 @@ class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
 
         if(neg) out = -out
 
+        // We read one character ahead, so restore it.
+        buffer.readerIndex(buffer.readerIndex() - 1)
         return out
     }
 
