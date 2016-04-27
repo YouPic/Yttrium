@@ -24,6 +24,7 @@ fun listenHttp(
     if(cors) {
         addLast(CorsHandler(CorsConfigBuilder.forAnyOrigin()
             .allowedRequestHeaders("Accept", "Content-Type", "API-VERSION")
+            .allowedRequestMethods(HttpMethod.GET, HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE)
             .build()))
     }
 
