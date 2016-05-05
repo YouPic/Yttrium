@@ -25,6 +25,12 @@ interface HttpClient {
 
     /** Set to true as long as the connection is active. */
     val connected: Boolean
+
+    /** Set to true if the connection is currently waiting for a response. */
+    val busy: Boolean
+
+    /** The nanoTime timestamp where the last request on this connection was handled. */
+    val lastRequest: Long
 }
 
 fun connectHttp(context: ServerContext, host: String, port: Int, timeout: Int = 0, f: (HttpClient?, Throwable?) -> Unit) {
@@ -44,8 +50,12 @@ fun connectHttp(context: ServerContext, host: String, port: Int, timeout: Int = 
 class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit): ChannelInboundHandlerAdapter(), HttpClient {
     private var context: ChannelHandlerContext? = null
     private var listener: ((FullHttpResponse?, Throwable?) -> Unit)? = null
+    private var lastFinish = System.nanoTime()
 
     override val connected: Boolean get() = context != null && context!!.channel().isActive
+    override val busy: Boolean get() = listener != null
+
+    override val lastRequest: Long get() = lastFinish
 
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
@@ -61,6 +71,7 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit): Chann
 
     override fun channelRead(context: ChannelHandlerContext, message: Any) {
         if(message is FullHttpResponse) {
+            lastFinish = System.nanoTime()
             listener?.invoke(message, null)
             listener = null
         }
