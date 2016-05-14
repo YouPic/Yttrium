@@ -3,6 +3,7 @@ package com.rimmer.yttrium.serialize
 import com.rimmer.yttrium.*
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
+import org.joda.time.DateTimeZone
 import java.util.*
 
 /**
@@ -150,7 +151,7 @@ fun readPrimitive(source: String, target: Class<*>): Any {
     } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
         return Unit
     } else if(target == DateTime::class.java) {
-        return maybeParseLong(source)?.let { DateTime(it) } ?: DateTime.parse(source)
+        return maybeParseLong(source)?.let { DateTime(it, DateTimeZone.UTC) } ?: DateTime.parse(source)
     } else if(target.isEnum) {
         return (target as Class<Enum<*>>).enumConstants.find {
             it.name == source
@@ -216,7 +217,7 @@ fun readJson(buffer: ByteBuf, target: Class<*>): Any {
         } else if(target == DateTime::class.java) {
             reader.parse()
             if(reader.type == JsonToken.Type.NumberLit) {
-                return DateTime(reader.numberPayload.toLong())
+                return DateTime(reader.numberPayload.toLong(), DateTimeZone.UTC)
             } else if(reader.type == JsonToken.Type.StringLit) {
                 return DateTime.parse(reader.stringPayload)
             } else {
@@ -272,7 +273,7 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
         } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
             return Unit
         } else if(target == DateTime::class.javaObjectType) {
-            return DateTime(buffer.readVarLong())
+            return DateTime(buffer.readVarLong(), DateTimeZone.UTC)
         } else if(target.isEnum) {
             val index = buffer.readVarInt()
             val values = (target as Class<Enum<*>>).enumConstants
