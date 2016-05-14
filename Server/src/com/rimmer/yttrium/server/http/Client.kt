@@ -12,7 +12,11 @@ import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder
 import io.netty.handler.codec.http.multipart.MemoryAttribute
+import io.netty.handler.ssl.SslContextBuilder
+import io.netty.handler.ssl.SslHandler
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import java.io.IOException
+import javax.net.ssl.SSLContext
 
 interface HttpClient {
     fun request(request: HttpRequest, f: (FullHttpResponse?, Throwable?) -> Unit)
@@ -33,21 +37,28 @@ interface HttpClient {
     val lastRequest: Long
 }
 
-fun connectHttp(context: ServerContext, host: String, port: Int, timeout: Int = 0, f: (HttpClient?, Throwable?) -> Unit) {
+fun connectHttp(context: ServerContext, host: String, port: Int, ssl: Boolean = false, timeout: Int = 0, f: (HttpClient?, Throwable?) -> Unit) {
     connect(context, host, port, timeout, {
+        val sslContext = if(ssl) {
+            val sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build()
+            val handler = SslHandler(sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port))
+            addLast(handler)
+            handler
+        } else null
+
         addLast(
             HttpResponseDecoder(),
             HttpRequestEncoder(),
             HttpObjectAggregator(16 * 1024 * 1024),
             HttpContentDecompressor(),
-            HttpClientHandler(f)
+            HttpClientHandler(f, sslContext)
         )
     }, {
         f(null, it)
     })
 }
 
-class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit): ChannelInboundHandlerAdapter(), HttpClient {
+class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ssl: SslHandler?): ChannelInboundHandlerAdapter(), HttpClient {
     private var context: ChannelHandlerContext? = null
     private var listener: ((FullHttpResponse?, Throwable?) -> Unit)? = null
     private var lastFinish = System.nanoTime()
@@ -59,7 +70,17 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit): Chann
 
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
-        onConnect(this, null)
+        if(ssl == null) {
+            onConnect(this, null)
+        } else {
+            ssl.handshakeFuture().addListener {
+                if(it.isSuccess) {
+                    onConnect(this, null)
+                } else {
+                    onConnect(null, it.cause())
+                }
+            }
+        }
     }
 
     override fun channelInactive(context: ChannelHandlerContext) {
@@ -112,6 +133,10 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit): Chann
     }
 
     override fun close() {
-        context?.close()
+        if(ssl == null) {
+            context?.close()
+        } else {
+            ssl.close().addListener {context?.close()}
+        }
     }
 }
