@@ -150,7 +150,7 @@ fun readPrimitive(source: String, target: Class<*>): Any {
     } else if(target == Unit::class.javaObjectType || target == Unit::class.javaPrimitiveType) {
         return Unit
     } else if(target == DateTime::class.java) {
-        return DateTime.parse(source)
+        return maybeParseLong(source)?.let { DateTime(it) } ?: DateTime.parse(source)
     } else if(target.isEnum) {
         return (target as Class<Enum<*>>).enumConstants.find {
             it.name == source
