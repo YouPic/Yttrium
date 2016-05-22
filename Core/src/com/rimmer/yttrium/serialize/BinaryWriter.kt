@@ -25,6 +25,11 @@ fun ByteBuf.writeString(s: String) {
     writeBytes(s.toByteArray(Charsets.UTF_8))
 }
 
+fun ByteBuf.writeBinary(b: ByteBuf) {
+    writeVarInt(b.readableBytes())
+    writeBytes(b)
+}
+
 fun ByteBuf.writeVarInt(value: Int) {
     var v = value
     do {
