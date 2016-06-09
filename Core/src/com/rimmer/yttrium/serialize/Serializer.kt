@@ -45,6 +45,12 @@ data class RawString(val value: String): Writable {
 }
 
 /**
+ * This is a special wrapper around ByteBuf,
+ * which represents a parameter that receives the body of a request.
+ */
+data class BodyContent(val value: ByteBuf)
+
+/**
  * Stores a value as json.
  * The value must be either a Writable type, or any of the following builtin types:
  * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String, Enum.

@@ -5,16 +5,24 @@ import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
 import com.rimmer.yttrium.router.HttpMethod
 import io.netty.buffer.Unpooled
+import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*
+import io.netty.handler.codec.http.HttpMethod as NettyMethod
 
-fun httpDefault(r: HttpRequest, f: (HttpResponse) -> Unit) {
-    val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.METHOD_NOT_ALLOWED)
+fun httpDefault(c: ChannelHandlerContext, r: HttpRequest, f: (HttpResponse) -> Unit) {
+    val status = if(r.method() === NettyMethod.OPTIONS) {
+        HttpResponseStatus.OK
+    } else {
+        HttpResponseStatus.METHOD_NOT_ALLOWED
+    }
+
+    val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status)
     response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN)
     f(response)
 }
 
 /** Parses a Netty http method. */
-fun convertMethod(method: io.netty.handler.codec.http.HttpMethod) = when(method.name()) {
+fun convertMethod(method: NettyMethod) = when(method.name()) {
     "GET" -> HttpMethod.GET
     "POST" -> HttpMethod.POST
     "DELETE" -> HttpMethod.DELETE

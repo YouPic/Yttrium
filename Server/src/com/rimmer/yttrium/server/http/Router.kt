@@ -4,10 +4,7 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.parseInt
 import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
-import com.rimmer.yttrium.serialize.JsonToken
-import com.rimmer.yttrium.serialize.readJson
-import com.rimmer.yttrium.serialize.readPrimitive
-import com.rimmer.yttrium.serialize.writeJson
+import com.rimmer.yttrium.serialize.*
 import com.rimmer.yttrium.sliceHash
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
@@ -24,7 +21,7 @@ val jsonContentType = AsciiString("application/json")
 class HttpRouter(
     val router: Router,
     val listener: RouteListener? = null,
-    val defaultHandler: (FullHttpRequest, (HttpResponse) -> Unit) -> Unit = ::httpDefault
+    val defaultHandler: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit = ::httpDefault
 ): (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit {
     private val segmentTrees = HttpMethod.values().map { m ->
         buildSegments(router.routes.filter { it.method == m })
@@ -40,7 +37,7 @@ class HttpRouter(
         // Check if the requested http method is known.
         val method = convertMethod(request.method())
         if(method == null) {
-            defaultHandler(request, f)
+            defaultHandler(context, request, f)
             return
         }
 
@@ -48,7 +45,7 @@ class HttpRouter(
         val parameters = ArrayList<String>()
         val route = findRoute(segmentTrees[method.ordinal], parameters, version, request.uri(), 1)
         if(route == null) {
-            defaultHandler(request, f)
+            defaultHandler(context, request, f)
             return
         }
 
@@ -69,6 +66,8 @@ class HttpRouter(
             } else {
                 parseBodyQuery(route, request, queries)
             }
+
+            route.bodyQuery?.let { queries[it] = BodyContent(request.content()) }
 
             // Make sure all required parameters were provided, and handle optional ones.
             checkQueries(route, queries)

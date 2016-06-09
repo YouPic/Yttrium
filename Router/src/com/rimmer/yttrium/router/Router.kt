@@ -2,6 +2,7 @@ package com.rimmer.yttrium.router
 
 import com.rimmer.yttrium.Task
 import com.rimmer.yttrium.router.plugin.Plugin
+import com.rimmer.yttrium.serialize.BodyContent
 import java.util.*
 
 class RoutePlugin(val plugin: Plugin<in Any>, val context: Any)
@@ -123,7 +124,14 @@ class Router(val plugins: List<Plugin<in Any>>) {
         // Create the route handler.
         val name = "$method ${swaggerRoute.info.path}"
         val inputSegments = segments.filter { it.type != null }.toTypedArray()
-        val route = Route(name, method, version, segments.toTypedArray(), inputSegments, queries.toTypedArray())
+        val bodyQuery = queries.indexOfFirst { it.type === BodyContent::class.java }
+        val route = Route(
+            name, method, version,
+            segments.toTypedArray(),
+            inputSegments,
+            queries.toTypedArray(),
+            if(bodyQuery == -1) null else bodyQuery
+        )
 
         route.handler = routeHandler(
             route,
