@@ -8,6 +8,7 @@ import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.EventLoopGroup
 import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder
@@ -37,8 +38,8 @@ interface HttpClient {
     val lastRequest: Long
 }
 
-fun connectHttp(context: ServerContext, host: String, port: Int, ssl: Boolean = false, timeout: Int = 0, f: (HttpClient?, Throwable?) -> Unit) {
-    connect(context, host, port, timeout, {
+fun connectHttp(loop: EventLoopGroup, host: String, port: Int, ssl: Boolean = false, timeout: Int = 0, f: (HttpClient?, Throwable?) -> Unit) {
+    connect(loop, host, port, timeout, {
         val sslContext = if(ssl) {
             val sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build()
             val handler = SslHandler(sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port))

@@ -8,6 +8,7 @@ import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.connect
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.EventLoopGroup
 import java.io.IOException
 import java.util.*
 
@@ -55,12 +56,12 @@ interface BinaryClient {
 }
 
 fun connectBinary(
-    context: ServerContext,
+    loop: EventLoopGroup,
     host: String,
     port: Int,
     timeout: Int = 0,
     onConnect: (BinaryClient?, Throwable?) -> Unit
-) = connect(context, host, port, timeout, {
+) = connect(loop, host, port, timeout, {
     addLast(BinaryClientHandler(onConnect))
 }, {
     onConnect(null, it)

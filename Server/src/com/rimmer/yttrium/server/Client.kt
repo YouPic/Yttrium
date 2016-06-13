@@ -11,14 +11,14 @@ import io.netty.channel.socket.nio.NioSocketChannel
 
 /** Connects to a remote server as a client. */
 inline fun connect(
-    context: ServerContext,
+    loop: EventLoopGroup,
     host: String,
     port: Int,
     timeout: Int = 0,
     crossinline pipeline: ChannelPipeline.() -> Unit,
     crossinline onFail: (Throwable?) -> Unit
 ): ChannelFuture {
-    val channel = if(context.handlerGroup is EpollEventLoopGroup) {
+    val channel = if(loop is EpollEventLoopGroup) {
         EpollSocketChannel::class.java
     } else {
         NioSocketChannel::class.java
@@ -28,7 +28,7 @@ inline fun connect(
         override fun initChannel(channel: SocketChannel) { pipeline(channel.pipeline()) }
     }
 
-    val b = Bootstrap().group(context.handlerGroup).channel(channel).handler(init)
+    val b = Bootstrap().group(loop).channel(channel).handler(init)
     if(timeout > 0) b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeout)
 
     val promise = b.connect(host, port)
