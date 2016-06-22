@@ -1,7 +1,7 @@
 package com.rimmer.yttrium.server.http
 
 import com.rimmer.yttrium.InvalidStateException
-import com.rimmer.yttrium.parseInt
+import com.rimmer.yttrium.maybeParseInt
 import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
 import com.rimmer.yttrium.serialize.*
@@ -29,8 +29,8 @@ class HttpRouter(
 
     override fun invoke(context: ChannelHandlerContext, request: FullHttpRequest, f: (HttpResponse) -> Unit) {
         // Check if the request contains a version request.
-        val versionString = request.headers().get("API-VERSION") ?: "0"
-        val version = parseInt(versionString, 0)
+        val acceptVersion = request.headers().get(HttpHeaderNames.ACCEPT)?.let {maybeParseInt(it)}
+        val version = acceptVersion ?: request.headers().get("API-VERSION")?.let { maybeParseInt(it) } ?: 0
         val remote = request.headers().get("X-Forwarded-For") ?:
             (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
 
@@ -61,16 +61,20 @@ class HttpRouter(
             val queries = parseQuery(route, request.uri())
             val content = request.content()
             val contentStart = content.readerIndex()
+            val bodyHandler = route.bodyQuery
 
             // Parse any parameters that were provided through the request body.
             // Only parse as form-data if the whole body isn't
-            val parseError = if(request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
-                parseJsonBody(route, request, queries)
-            } else if(route.bodyQuery == null) {
-                parseBodyQuery(route, request, queries)
-            } else null
-
-            route.bodyQuery?.let { queries[it] = BodyContent(content.readerIndex(contentStart)) }
+            val parseError = if(bodyHandler == null) {
+                if (request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
+                    parseJsonBody(route, request, queries)
+                } else if (route.bodyQuery == null) {
+                    parseBodyQuery(route, request, queries)
+                } else null
+            } else {
+                queries[bodyHandler] = BodyContent(content.readerIndex(contentStart))
+                null
+            }
 
             // Make sure all required parameters were provided, and handle optional ones.
             checkQueries(route, queries, parseError)
