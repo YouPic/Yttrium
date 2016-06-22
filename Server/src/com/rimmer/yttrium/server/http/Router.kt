@@ -59,18 +59,21 @@ class HttpRouter(
         try {
             val params = parseParameters(route, parameters)
             val queries = parseQuery(route, request.uri())
+            val content = request.content()
+            val contentStart = content.readerIndex()
 
             // Parse any parameters that were provided through the request body.
-            if(request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
+            // Only parse as form-data if the whole body isn't
+            val parseError = if(request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
                 parseJsonBody(route, request, queries)
-            } else {
+            } else if(route.bodyQuery == null) {
                 parseBodyQuery(route, request, queries)
-            }
+            } else null
 
-            route.bodyQuery?.let { queries[it] = BodyContent(request.content()) }
+            route.bodyQuery?.let { queries[it] = BodyContent(content.readerIndex(contentStart)) }
 
             // Make sure all required parameters were provided, and handle optional ones.
-            checkQueries(route, queries)
+            checkQueries(route, queries, parseError)
 
             // Call the route with a listener that sends the result back to the client.
             val listener = object: RouteListener {
@@ -227,7 +230,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             // Check if this parameter is used.
             val name = q.sliceHash(0, separator)
             params.forEachIndexed { i, query ->
-                if(query.hash == name) {
+                if(query.hash == name && query.type !== BodyContent::class.java) {
                     val string = URLDecoder.decode(q.substring(separator + 1), "UTF-8")
                     values[i] = readPrimitive(string, query.type)
                 }
@@ -238,8 +241,12 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
     return values
 }
 
-/** Parses any query parameters that were provided through the request body. */
-fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>) {
+/**
+ * Parses any query parameters that were provided through the request body.
+ * @return The first parsing error that occurred, which can be propagated if the whole request fails due it.
+ */
+fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>): Throwable? {
+    var error: Throwable? = null
     if(request.content().readableBytes() > 0) {
         val bodyDecoder = HttpPostRequestDecoder(request)
         while(try { bodyDecoder.hasNext() } catch(e: HttpPostRequestDecoder.EndOfDataDecoderException) { false }) {
@@ -248,7 +255,7 @@ fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>)
             // Check if this parameter is recognized.
             val name = p.name.hashCode()
             route.queries.forEachIndexed { i, query ->
-                if(query.hash == name) {
+                if(query.hash == name && query.type !== BodyContent::class.java) {
                     val buffer = p.byteBuf
                     val index = buffer.readerIndex()
 
@@ -258,40 +265,54 @@ fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>)
                         queries[i] = readJson(buffer, query.type)
                     } catch(e: Throwable) {
                         buffer.readerIndex(index)
-                        queries[i] = readPrimitive(buffer.toString(Charsets.UTF_8), query.type)
+                        try {
+                            queries[i] = readPrimitive(buffer.toString(Charsets.UTF_8), query.type)
+                        } catch(e: Throwable) {
+                            // If both parsing tries failed, we set the exception to be propagated if needed.
+                            if(error == null) {
+                                error = e
+                            }
+                        }
                     }
                 }
             }
         }
     }
+    return error
 }
 
 /** Parses query parameters from a json body. */
-fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>) {
+fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>): Throwable? {
     val buffer = request.content()
     if(buffer.isReadable) {
-        val json = JsonToken(buffer)
-        json.expect(JsonToken.Type.StartObject)
-        while(true) {
-            json.parse()
-            if(json.type == JsonToken.Type.EndObject) {
-                break
-            } else if(json.type == JsonToken.Type.FieldName) {
-                val name = json.stringPayload.hashCode()
-                route.queries.forEachIndexed { i, query ->
-                    if(query.hash == name) {
-                        queries[i] = readJson(buffer, query.type)
+        try {
+            val json = JsonToken(buffer)
+            json.expect(JsonToken.Type.StartObject)
+            while (true) {
+                json.parse()
+                if (json.type == JsonToken.Type.EndObject) {
+                    break
+                } else if (json.type == JsonToken.Type.FieldName) {
+                    val name = json.stringPayload.hashCode()
+                    route.queries.forEachIndexed { i, query ->
+                        if (query.hash == name && query.type !== BodyContent::class.java) {
+                            queries[i] = readJson(buffer, query.type)
+                        }
                     }
+                } else {
+                    return InvalidStateException("Expected json field name before offset ${request.content().readerIndex()}")
                 }
-            } else {
-                throw InvalidStateException("Expected json field name before offset ${request.content().readerIndex()}")
             }
+        } catch(e: Throwable) {
+            return e
         }
     }
+
+    return null
 }
 
 /** Makes sure that all required query parameters have been set correctly. */
-fun checkQueries(route: Route, args: Array<Any?>) {
+fun checkQueries(route: Route, args: Array<Any?>, parseError: Throwable?) {
     route.queries.forEachIndexed { i, query ->
         val v = args[i]
         if(v == null) {
@@ -300,8 +321,9 @@ fun checkQueries(route: Route, args: Array<Any?>) {
             } else {
                 val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
                 val type = "of type ${query.type.simpleName}"
+                val error = if(parseError != null) "due to $parseError" else ""
                 throw InvalidStateException(
-                    "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type"
+                    "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type $error"
                 )
             }
         }
