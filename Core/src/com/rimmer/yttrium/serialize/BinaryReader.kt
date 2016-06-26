@@ -4,11 +4,21 @@ import com.rimmer.yttrium.ByteString
 import com.rimmer.yttrium.LocalByteString
 import io.netty.buffer.ByteBuf
 
+object FieldType {
+    val VarInt = 0
+    val Fixed32 = 1
+    val Fixed64 = 2
+    val LengthEncoded = 3
+    val Object = 4
+}
+
 /*
  * Helper functions for reading binary data.
  */
 
-fun ByteBuf.readFieldId() = readByte().toInt()
+fun ByteBuf.readFieldId() = readVarInt()
+fun typeFromId(id: Int) = id and 0b111
+fun fieldFromId(id: Int) = id shr 3
 
 fun ByteBuf.readString(): String {
     val length = readVarInt()
@@ -53,4 +63,34 @@ fun ByteBuf.readVarLong(): Long {
         c++
     }
     return v
+}
+
+fun ByteBuf.skipField(id: Int) {
+    val type = typeFromId(id)
+    if(type == FieldType.Object) {
+        skipObject(type)
+    } else {
+        skipValue(type)
+    }
+}
+
+private fun ByteBuf.skipObject(type: Int) {
+    skipValue(type)
+    while(true) {
+        val field = readFieldId()
+        if(fieldFromId(field) == 0) break
+        else skipField(field)
+    }
+}
+
+private fun ByteBuf.skipValue(type: Int) {
+    when(type) {
+        FieldType.VarInt -> readVarLong()
+        FieldType.Fixed32 -> skipBytes(4)
+        FieldType.Fixed64 -> skipBytes(8)
+        FieldType.LengthEncoded -> {
+            val length = readVarInt()
+            skipBytes(length)
+        }
+    }
 }

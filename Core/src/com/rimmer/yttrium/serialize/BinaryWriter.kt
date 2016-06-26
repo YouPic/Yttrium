@@ -11,8 +11,8 @@ fun ByteBuf.endObject() {
     writeByte(0)
 }
 
-fun ByteBuf.writeFieldId(id: Int) {
-    writeByte(id)
+fun ByteBuf.writeFieldId(id: Int, type: Int) {
+    writeVarInt((id shl 3) or type)
 }
 
 fun ByteBuf.writeByteString(s: ByteString) {
