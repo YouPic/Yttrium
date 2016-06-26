@@ -298,10 +298,16 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
                     break
                 } else if (json.type == JsonToken.Type.FieldName) {
                     val name = json.stringPayload.hashCode()
+                    var found = false
                     route.queries.forEachIndexed { i, query ->
                         if (query.hash == name && query.type !== BodyContent::class.java) {
+                            found = true
                             queries[i] = readJson(buffer, query.type)
                         }
+                    }
+
+                    if(!found) {
+                        json.skipValue()
                     }
                 } else {
                     return InvalidStateException("Expected json field name before offset ${request.content().readerIndex()}")
