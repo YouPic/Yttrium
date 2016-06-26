@@ -66,15 +66,17 @@ fun ByteBuf.readVarLong(): Long {
     return v
 }
 
-inline fun ByteBuf.mapObject(onField: (Int) -> Unit) {
+inline fun ByteBuf.mapObject(onField: (id: Int, type: Int) -> Unit) {
     var header = readVarInt()
     var count = 0
+    var id = 0
 
     while(true) {
         val type = header and 0b111
-        onField(type)
+        if(type != 0) onField(id, type)
         header = header ushr 3
         count++
+        id++
 
         if(header == 0) {
             return
@@ -85,9 +87,9 @@ inline fun ByteBuf.mapObject(onField: (Int) -> Unit) {
     }
 }
 
-inline fun ByteBuf.readObject(onField: (Int) -> Boolean) = mapObject {
-    if(!onField(it)) {
-        skipField(it)
+inline fun ByteBuf.readObject(onField: (id: Int) -> Boolean) = mapObject { id, type ->
+    if(!onField(id)) {
+        skipField(type)
     }
 }
 
@@ -120,7 +122,7 @@ fun ByteBuf.skipField(type: Int) {
             val length = readVarInt()
             skipBytes(length)
         }
-        FieldType.Object -> mapObject {skipField(it)}
+        FieldType.Object -> mapObject {id, type -> skipField(type)}
         FieldType.Map -> readMap {i, from, to ->
             skipField(from)
             skipField(to)
