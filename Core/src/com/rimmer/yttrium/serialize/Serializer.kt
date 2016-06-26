@@ -306,7 +306,7 @@ fun readBinary(buffer: ByteBuf, target: Class<*>): Any {
 }
 
 /** Helper function for parsing auto-generated data types. */
-inline fun parseJsonObject(buffer: ByteBuf, field: (JsonToken) -> Unit) {
+inline fun parseJsonObject(buffer: ByteBuf, field: (JsonToken) -> Boolean) {
     val token = JsonToken(buffer)
     token.expect(JsonToken.Type.StartObject)
 
@@ -315,7 +315,9 @@ inline fun parseJsonObject(buffer: ByteBuf, field: (JsonToken) -> Unit) {
         if(token.type == JsonToken.Type.EndObject) {
             break
         } else if(token.type == JsonToken.Type.FieldName) {
-            field(token)
+            if(!field(token)) {
+                token.skipValue()
+            }
         } else {
             throw InvalidStateException("Invalid json: expected field or object end")
         }

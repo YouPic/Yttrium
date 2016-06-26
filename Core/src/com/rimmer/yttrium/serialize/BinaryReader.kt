@@ -10,6 +10,7 @@ object FieldType {
     val Fixed64 = 2
     val LengthEncoded = 3
     val Object = 4
+    val Unit = 5
 }
 
 /*
@@ -92,5 +93,6 @@ private fun ByteBuf.skipValue(type: Int) {
             val length = readVarInt()
             skipBytes(length)
         }
+        FieldType.Unit -> {}
     }
 }
