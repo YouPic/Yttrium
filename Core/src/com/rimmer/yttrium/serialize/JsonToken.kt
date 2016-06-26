@@ -48,8 +48,37 @@ class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
         }
     }
 
+    fun skipValue() {
+        parse()
+        skipElement()
+    }
+
     fun peekArrayEnd(): Boolean {
         return buffer.getByte(buffer.readerIndex()).toChar() == ']'
+    }
+
+    private fun skipElement() {
+        if(type === Type.StartObject) skipObject()
+        else if(type === Type.StartArray) skipArray()
+        else if(type === Type.EndObject || type === Type.EndArray)
+            throw InvalidStateException("Invalid json: Cannot have $type here.")
+    }
+
+    private fun skipObject() {
+        while(true) {
+            parse()
+            if(type === Type.EndObject) return
+            else if(type === Type.FieldName) skipValue()
+            else throw InvalidStateException("Invalid json: Expected field name")
+        }
+    }
+
+    private fun skipArray() {
+        while(true) {
+            parse()
+            if(type === Type.EndArray) return
+            else skipElement()
+        }
     }
 
     private fun parseValue(first: Char) {
