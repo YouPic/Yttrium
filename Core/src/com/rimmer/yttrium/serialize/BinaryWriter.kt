@@ -7,14 +7,6 @@ import io.netty.buffer.ByteBuf
  * Helper functions for writing binary data.
  */
 
-fun ByteBuf.endObject() {
-    writeByte(0)
-}
-
-fun ByteBuf.writeFieldId(id: Int, type: Int) {
-    writeVarInt((id shl 3) or type)
-}
-
 fun ByteBuf.writeByteString(s: ByteString) {
     writeVarInt(s.size)
     s.write(this)

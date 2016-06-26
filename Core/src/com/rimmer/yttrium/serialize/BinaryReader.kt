@@ -5,21 +5,21 @@ import com.rimmer.yttrium.LocalByteString
 import io.netty.buffer.ByteBuf
 
 object FieldType {
-    val VarInt = 0
-    val Fixed32 = 1
-    val Fixed64 = 2
-    val LengthEncoded = 3
-    val Object = 4
-    val Unit = 5
+    val Empty = 0
+    val VarInt = 1
+    val Fixed32 = 2
+    val Fixed64 = 3
+    val LengthEncoded = 4
+    val Object = 5
+    val Map = 6
+    val Array = 7
 }
 
 /*
  * Helper functions for reading binary data.
  */
 
-fun ByteBuf.readFieldId() = readVarInt()
-fun typeFromId(id: Int) = id and 0b111
-fun fieldFromId(id: Int) = id shr 3
+fun ByteBuf.readObjectIndex() = readVarInt()
 
 fun ByteBuf.readString(): String {
     val length = readVarInt()
@@ -66,26 +66,53 @@ fun ByteBuf.readVarLong(): Long {
     return v
 }
 
-fun ByteBuf.skipField(id: Int) {
-    val type = typeFromId(id)
-    if(type == FieldType.Object) {
-        skipObject(type)
-    } else {
-        skipValue(type)
-    }
-}
+inline fun ByteBuf.mapObject(onField: (Int) -> Unit) {
+    var header = readVarInt()
+    var count = 0
 
-private fun ByteBuf.skipObject(type: Int) {
-    skipValue(type)
     while(true) {
-        val field = readFieldId()
-        if(fieldFromId(field) == 0) break
-        else skipField(field)
+        val type = header and 0b111
+        onField(type)
+        header = header ushr 3
+        count++
+
+        if(header == 0) {
+            return
+        } else if(count >= 10 && header != 0) {
+            header = readVarInt()
+            count = 0
+        }
     }
 }
 
-private fun ByteBuf.skipValue(type: Int) {
+inline fun ByteBuf.readObject(onField: (Int) -> Boolean) = mapObject {
+    if(!onField(it)) {
+        skipField(it)
+    }
+}
+
+inline fun ByteBuf.readMap(onPair: (index: Long, fromType: Int, toType: Int) -> Unit) {
+    val header = readVarLong()
+    val fromType = header.toInt() and 0b111
+    val toType = (header.toInt() shr 3) and 0b111
+    val length = header ushr 6
+    for(i in 0..length - 1) {
+        onPair(i, fromType, toType)
+    }
+}
+
+inline fun ByteBuf.readArray(onValue: (index: Long, type: Int) -> Unit) {
+    val header = readVarLong()
+    val type = header.toInt() and 0b111
+    val length = header shr 3
+    for(i in 0..length - 1) {
+        onValue(i, type)
+    }
+}
+
+fun ByteBuf.skipField(type: Int) {
     when(type) {
+        FieldType.Empty -> {}
         FieldType.VarInt -> readVarLong()
         FieldType.Fixed32 -> skipBytes(4)
         FieldType.Fixed64 -> skipBytes(8)
@@ -93,6 +120,13 @@ private fun ByteBuf.skipValue(type: Int) {
             val length = readVarInt()
             skipBytes(length)
         }
-        FieldType.Unit -> {}
+        FieldType.Object -> mapObject {skipField(it)}
+        FieldType.Map -> readMap {i, from, to ->
+            skipField(from)
+            skipField(to)
+        }
+        FieldType.Array -> readArray { i, type ->
+            skipField(type)
+        }
     }
 }

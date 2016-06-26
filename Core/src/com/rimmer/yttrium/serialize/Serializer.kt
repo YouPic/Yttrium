@@ -324,19 +324,6 @@ inline fun parseJsonObject(buffer: ByteBuf, field: (JsonToken) -> Boolean) {
     }
 }
 
-/** Helper function for parsing auto-generated data types. */
-inline fun parseBinaryObject(buffer: ByteBuf, onField: (Int) -> Boolean) {
-    loop@ while(true) {
-        val id = buffer.readFieldId()
-        val field = fieldFromId(id)
-        if(field == 0) {
-            break@loop
-        } else if(!onField(field)) {
-            buffer.skipField(id)
-        }
-    }
-}
-
 class Readable(val fromJson: (ByteBuf) -> Any, val fromBinary: (ByteBuf) -> Any)
 
 /** Registers a readable type. */
