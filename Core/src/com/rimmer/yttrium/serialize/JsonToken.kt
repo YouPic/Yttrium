@@ -46,6 +46,13 @@ class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
         } else {
             parseValue(b.toChar())
         }
+
+        if(buffer.isReadable) {
+            val c = buffer.getByte(buffer.readerIndex()).toChar()
+            if (c == ',') {
+                buffer.skipBytes(1)
+            }
+        }
     }
 
     fun skipValue() {
@@ -114,13 +121,6 @@ class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
             type = Type.NullLit
         } else {
             throw InvalidStateException("Invalid json: expected a value")
-        }
-
-        if(buffer.isReadable) {
-            val c = buffer.getByte(buffer.readerIndex()).toChar()
-            if (c == ',') {
-                buffer.skipBytes(1)
-            }
         }
     }
 
