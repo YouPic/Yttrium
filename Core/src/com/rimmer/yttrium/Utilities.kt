@@ -1,5 +1,8 @@
 package com.rimmer.yttrium
 
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
+
 /*
  * Misc. helper functions that don't belong in a specific place.
  */
@@ -59,3 +62,9 @@ inline fun <E> Iterable<E>.iterateLast(element: (E) -> Unit, last: (E) -> Unit) 
 inline fun <E> Iterable<E>.sepBy(string: StringBuilder, sep: String, f: (E) -> Unit) {
     iterateLast({f(it); string.append(sep)}, {f(it)})
 }
+
+/** Converts a byte buffer to a string. */
+val ByteBuf.string: String get() = toString(Charsets.UTF_8)
+
+/** Converts a string to a bytebuf. */
+val String.byteBuf: ByteBuf get() = Unpooled.wrappedBuffer(toByteArray(Charsets.UTF_8))

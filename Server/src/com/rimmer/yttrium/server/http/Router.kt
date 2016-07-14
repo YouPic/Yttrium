@@ -6,6 +6,7 @@ import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
 import com.rimmer.yttrium.serialize.*
 import com.rimmer.yttrium.sliceHash
+import com.rimmer.yttrium.string
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
@@ -270,7 +271,7 @@ fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>)
                     } catch(e: Throwable) {
                         buffer.readerIndex(index)
                         try {
-                            queries[i] = readPrimitive(buffer.toString(Charsets.UTF_8), query.type)
+                            queries[i] = readPrimitive(buffer.string, query.type)
                         } catch(e: Throwable) {
                             // If both parsing tries failed, we set the exception to be propagated if needed.
                             if(error == null) {
