@@ -27,7 +27,19 @@ class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
 
     fun expect(type: Type, allowNull: Boolean = false) {
         parse()
-        if(this.type != type || (this.type == Type.NullLit && !allowNull)) {
+
+        // It is very common for js-produced values to contain strings that should be numbers.
+        // We add a conversion here as a special case.
+        if(type === Type.NumberLit && this.type === Type.StringLit) {
+            try {
+                numberPayload = java.lang.Double.parseDouble(stringPayload)
+                this.type = type
+            } catch(e: NumberFormatException) {
+                // If this happens the type will be wrong and we throw an exception later.
+            }
+        }
+
+        if(this.type !== type || (this.type === Type.NullLit && !allowNull)) {
             throw InvalidStateException("Invalid json: Expected $type")
         }
     }
