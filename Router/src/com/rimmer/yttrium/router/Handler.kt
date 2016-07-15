@@ -59,12 +59,18 @@ fun routeHandler(
                     }
                 }
             } else {
-                context.call(args).handler = { r: Any?, e: Throwable? ->
-                    if(e == null) {
-                        modifyResult(plugins.iterator(), r)
-                    } else {
-                        listener.onFail(context, e)
+                // Sometimes the call handler itself can throw exceptions, which we need to handle correctly.
+                // Otherwise we risk compromising our state, since exceptions can go far back in the continuation chain.
+                try {
+                    context.call(args).handler = { r: Any?, e: Throwable? ->
+                        if (e == null) {
+                            modifyResult(plugins.iterator(), r)
+                        } else {
+                            listener.onFail(context, e)
+                        }
                     }
+                } catch(e: Throwable) {
+                    listener.onFail(context, e)
                 }
             }
         }
