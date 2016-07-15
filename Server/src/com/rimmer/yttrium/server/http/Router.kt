@@ -1,12 +1,9 @@
 package com.rimmer.yttrium.server.http
 
-import com.rimmer.yttrium.InvalidStateException
-import com.rimmer.yttrium.maybeParseInt
+import com.rimmer.yttrium.*
 import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
 import com.rimmer.yttrium.serialize.*
-import com.rimmer.yttrium.sliceHash
-import com.rimmer.yttrium.string
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
@@ -293,17 +290,31 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
         try {
             val json = JsonToken(buffer)
             json.expect(JsonToken.Type.StartObject)
-            while (true) {
+            while(true) {
                 json.parse()
-                if (json.type == JsonToken.Type.EndObject) {
+                if(json.type == JsonToken.Type.EndObject) {
                     break
-                } else if (json.type == JsonToken.Type.FieldName) {
+                } else if(json.type == JsonToken.Type.FieldName) {
                     val name = json.stringPayload.hashCode()
                     var found = false
                     route.queries.forEachIndexed { i, query ->
-                        if (query.hash == name && query.type !== BodyContent::class.java) {
+                        if(query.hash == name && query.type !== BodyContent::class.java) {
                             found = true
-                            queries[i] = readJson(buffer, query.type)
+                            val offset = buffer.readerIndex()
+
+                            if(json.peekString()) {
+                                // Sometimes body parameters are inside a json string, which we need to support.
+                                // Since we can't know which one it is, we have to try both...
+                                try {
+                                    queries[i] = readJson(buffer, query.type)
+                                } catch(e: Throwable) {
+                                    buffer.readerIndex(offset)
+                                    json.parse()
+                                    queries[i] = readJson(json.stringPayload.byteBuf, query.type)
+                                }
+                            } else {
+                                queries[i] = readJson(buffer, query.type)
+                            }
                         }
                     }
 

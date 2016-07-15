@@ -73,7 +73,13 @@ class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
     }
 
     fun peekArrayEnd(): Boolean {
+        skipWhitespace()
         return buffer.getByte(buffer.readerIndex()).toChar() == ']'
+    }
+
+    fun peekString(): Boolean {
+        skipWhitespace()
+        return buffer.getByte(buffer.readerIndex()).toChar() == '"'
     }
 
     private fun skipElement() {
