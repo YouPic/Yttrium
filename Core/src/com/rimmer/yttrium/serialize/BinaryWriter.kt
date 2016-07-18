@@ -35,6 +35,8 @@ fun ByteBuf.writeVarInt(value: Int) {
     } while(v != 0)
 }
 
+fun ByteBuf.writeBoolean(value: Boolean) = writeVarInt(if(value) 1 else 0)
+
 fun ByteBuf.writeVarLong(value: Long) {
     var v = value
 
@@ -47,4 +49,21 @@ fun ByteBuf.writeVarLong(value: Long) {
 
         v = v ushr 7
     } while(v != 0L)
+}
+
+inline fun <T> ByteBuf.writeArray(valueType: Int, array: Collection<T>, write: ByteBuf.(T) -> Unit) {
+    writeVarInt((array.size shl 3) or valueType)
+    for(i in array) this.write(i)
+}
+
+inline fun <K, V> ByteBuf.writeMap(
+    keyType: Int, valueType: Int, map: Map<K, V>,
+    writeKey: ByteBuf.(K) -> Unit,
+    writeValue: ByteBuf.(V) -> Unit
+) {
+    writeVarLong((map.size.toLong() shl 6) or keyType.toLong() or (valueType.toLong() shl 3))
+    for(kv in map) {
+        this.writeKey(kv.key)
+        this.writeValue(kv.value)
+    }
 }
