@@ -4,7 +4,6 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
 import com.rimmer.yttrium.serialize.*
-import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.connect
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
@@ -16,36 +15,31 @@ interface BinaryClient {
     /**
      * Calls a route and receives its result.
      * @param route The hash of the route to call
-     * @param path An ordered set of path parameters.
-     * @param queries An ordered set of query parameters.
-     * @param target The expected result type of the route.
+     * @param writeArgs A function that writes the call arguments, including the query null map.
+     * @param readResponse A function that reads the call result on success.
      * @param f Called to receive the result.
      */
-    fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit)
+    fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit)
 
     /**
      * Calls a route without receiving its result.
      * @param route The hash of the route to call
-     * @param path An ordered set of path parameters.
-     * @param queries An ordered set of query parameters.
-     * @param target The expected result type of the route (this is needed by the protocol).
+     * @param writeArgs A function that writes the call arguments, including the query null map.
+     * @param readResponse A function that reads the call result on success.
      */
-    fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>)
+    fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T)
 
     /**
      * Calls a route and subscribes on its results.
      * @param route The hash of the route to call
-     * @param path An ordered set of path parameters.
-     * @param queries An ordered set of query parameters.
-     * @param target The expected result type of the route.
+     * @param writeArgs A function that writes the call arguments, including the query null map.
+     * @param readResponse A function that reads the call result on success.
      * @param f Called to receive the results. This will continue being called until the subscription is closed.
      * @return A subscription id that can be used to unsubscribe.
      */
-    fun subscribe(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit): Int
+    fun <T: Any> subscribe(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit): Int
 
-    /**
-     * Stops receiving messages from the provided subscription id.
-     */
+    /** Stops receiving messages from the provided subscription id. */
     fun unsubscribe(subscription: Int)
 
     /** Closes this connection. Any calls after this will fail. */
@@ -68,7 +62,7 @@ fun connectBinary(
 })
 
 class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): BinaryDecoder(), BinaryClient {
-    private data class Request(val target: Class<*>, val handler: ((Any?, Throwable?) -> Unit)?, val isPush: Boolean)
+    private data class Request(val targetReader: ByteBuf.() -> Any, val handler: ((Any?, Throwable?) -> Unit)?, val isPush: Boolean)
 
     private var context: ChannelHandlerContext? = null
     private val requests = ArrayList<Request?>()
@@ -90,16 +84,16 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         requests.clear()
     }
 
-    override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>) {
-        performRequest(Request(target, null, false), route, path, queries)
+    override fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T) {
+        performRequest(Request(readResponse, null, false), route, writeArgs)
     }
 
-    override fun call(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit) {
-        performRequest(Request(target, f, false), route, path, queries)
+    override fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit) {
+        performRequest(Request(readResponse, f, false), route, writeArgs)
     }
 
-    override fun subscribe(route: Int, path: Array<Any?>, queries: Array<Any?>, target: Class<*>, f: (Any?, Throwable?) -> Unit): Int {
-        return performRequest(Request(target, null, true), route, path, queries)
+    override fun <T: Any> subscribe(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit): Int {
+        return performRequest(Request(readResponse, null, true), route, writeArgs)
     }
 
     override fun unsubscribe(subscription: Int) {
@@ -126,19 +120,11 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         }
     }
 
-    private fun performRequest(r: Request, route: Int, path: Array<Any?>, queries: Array<Any?>): Int {
+    private fun performRequest(r: Request, route: Int, writeArgs: ByteBuf.() -> Unit): Int {
         val id = addRequest(r)
         writePacket(context!!, id) { target, commit ->
             target.writeVarInt(route)
-
-            for(p in path) {
-                writeBinary(p, target)
-            }
-
-            writeNullMap(queries, target)
-            for(q in queries) {
-                writeBinary(q, target)
-            }
+            writeArgs(target)
             commit()
         }
         return id
@@ -166,7 +152,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     private fun mapResponse(request: Request, packet: ByteBuf) {
         val response = packet.readByte().toInt()
         if(response == ResponseCode.Success.ordinal) {
-            val result = readBinary(packet, request.target)
+            val result = request.targetReader(packet)
             request.handler?.invoke(result, null)
         } else {
             val error = packet.readString()

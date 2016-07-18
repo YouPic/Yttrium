@@ -32,7 +32,7 @@ fun routeHandler(
         // Let each plugin modify the result as needed.
         // After each plugin has run, we send the final result to the route listener.
         fun modifyResult(plugin: Iterator<RoutePlugin>, result: Any?) {
-            if (plugin.hasNext()) {
+            if(plugin.hasNext()) {
                 val p = plugin.next()
                 p.plugin.modifyResult(p.context, context, result) { r, e ->
                     if(e == null) {
@@ -49,7 +49,7 @@ fun routeHandler(
         // Let each plugin modify the call as needed.
         // After each plugin has run, we call the route handler.
         fun modifyCall(plugin: Iterator<RoutePlugin>, args: Array<Any?>) {
-            if (plugin.hasNext()) {
+            if(plugin.hasNext()) {
                 val p = plugin.next()
                 p.plugin.modifyCall(p.context, context, args) { e ->
                     if(e == null) {

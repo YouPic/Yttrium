@@ -2,9 +2,10 @@ package com.rimmer.yttrium.router
 
 import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
+import com.rimmer.yttrium.serialize.Reader
+import com.rimmer.yttrium.serialize.Writer
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
-import io.netty.handler.codec.http.FullHttpRequest
 
 /** The supported http call methods. */
 enum class HttpMethod {GET, POST, DELETE, PUT}
@@ -26,6 +27,7 @@ class Route(
     val segments: Array<PathSegment>,
     val typedSegments: Array<PathSegment>,
     val queries: Array<RouteQuery>,
+    val writer: Writer<in Any>?,
     val bodyQuery: Int?,
     var handler: (RouteContext, RouteListener) -> Unit = {c, r ->}
 )
@@ -33,7 +35,7 @@ class Route(
 /** Interface that can be used by plugins to modify the signature of a route. */
 interface RouteModifier {
     /** The parameter types that need to be provided to the route handler. */
-    val parameterTypes: Array<Class<*>>
+    val parameterReaders: Array<Reader>
 
     /**
      * Indicates that this plugin will provide this parameter to the route handler.
@@ -52,24 +54,24 @@ interface RouteModifier {
      * Adds an additional query parameter.
      * @return The id of the created query. This can be used to retrieve it in modifyCall.
      */
-    fun addArg(name: String, type: Class<*>, description: String = ""): Int
+    fun addArg(name: String, reader: Reader, description: String = ""): Int
 
     /**
      * Adds an additional optional query parameter.
      * @return The id of the created query. This can be used to retrieve it in modifyCall.
      */
-    fun addOptional(name: String, type: Class<*>, default: Any? = null, description: String = ""): Int
+    fun addOptional(name: String, reader: Reader, default: Any? = null, description: String = ""): Int
 
     /** Returns the index of the first argument of the provided type, or null. */
     fun hasParameter(type: Class<*>): Int? {
-        val i = parameterTypes.indexOf(type)
+        val i = parameterReaders.indexOfFirst { it.target === type }
         return if(i == -1) null else i
     }
 
     /** If a parameter of the requested type exists, provide it and return its index. */
-    fun provideIfExists(type: Class<*>): Int? {
-        val i = hasParameter(type)
-        if(i != null) provideParameter(i)
+    fun provide(type: Class<*>): Int {
+        val i = hasParameter(type) ?: throw IllegalArgumentException("No parameter of type $type exists.")
+        provideParameter(i)
         return i
     }
 }
@@ -84,14 +86,14 @@ class RouteProperty(val name: String, val value: Any)
  * Represents a query parameter within a route.
  * @param name The parameter name as it appears in the url.
  * @param hash The hash of the parameter name.
- * @param type The type this should be parsed to.
+ * @param reader A reader for the query target type.
  * @param default If set, the parameter is optional and should be set to this if not provided.
  * @param description The provided description of this parameter.
  */
 class RouteQuery(
     val name: String,
     val hash: Int,
-    val type: Class<*>,
+    val reader: Reader,
     val optional: Boolean,
     val default: Any?,
     val description: String

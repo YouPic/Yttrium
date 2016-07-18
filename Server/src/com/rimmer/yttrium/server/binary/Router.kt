@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.server.binary
 
+import com.rimmer.yttrium.HttpException
 import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
@@ -8,13 +9,14 @@ import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.RouteListener
 import com.rimmer.yttrium.router.Router
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.server.http.checkQueries
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
 import java.net.InetSocketAddress
 
 enum class ResponseCode {
-    Success, NoRoute, NotFound, InvalidArgs, NoPermission, InternalError
+    Success, NoRoute, NotFound, InvalidArgs, NoPermission, InternalError, MiscError
 }
 
 fun routeHash(r: Route) = routeHash(r.name, r.version)
@@ -38,30 +40,28 @@ class BinaryRouter(
         val eventLoop = context.channel().eventLoop()
         val callId = listener?.onStart(eventLoop, route) ?: 0
         val params = arrayOfNulls<Any>(route.typedSegments.size)
+        val paramCount = params.size
         val queries = arrayOfNulls<Any>(route.queries.size)
+        val writer = route.writer
 
         // We can't really detect specific problems in the call parameters
         // without making everything really complicated,
         // so if the decoding fails we just return a simple error.
         try {
-            route.typedSegments.forEachIndexed { i, segment ->
-                params[i] = readBinary(source, segment.type!!)
-            }
-
-            val nullMap = source.readVarLong()
-            route.queries.forEachIndexed { i, query ->
-                if ((nullMap and (1L shl i)) != 0L) {
-                    queries[i] = readBinary(source, query.type)
-                } else if (query.optional) {
-                    queries[i] = query.default
+            source.readObject {
+                if(it > paramCount + queries.size) {
+                    false
+                } else if(it > paramCount) {
+                    val i = it - paramCount
+                    queries[i] = route.queries[i].reader.fromBinary(source)
+                    true
                 } else {
-                    val description = if (query.description.isNotEmpty()) "(${query.description})" else "(no description)"
-                    val type = "of type ${query.type.simpleName}"
-                    throw InvalidStateException(
-                        "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type"
-                    )
+                    params[it] = route.typedSegments[it].reader!!.fromBinary(source)
+                    true
                 }
             }
+
+            checkQueries(route, queries, null)
 
             // Create a secondary listener that writes responses to the caller before forwarding to the original one.
             val listener = object: RouteListener {
@@ -70,7 +70,15 @@ class BinaryRouter(
                     val writerIndex = target.writerIndex()
                     try {
                         target.writeByte(ResponseCode.Success.ordinal)
-                        writeBinary(result, target)
+                        if(writer === null) {
+                            if(result is Writable) {
+                                result.encodeBinary(target)
+                            } else {
+                                throw IllegalStateException("Unserializable response: $result")
+                            }
+                        } else {
+                            writer.toBinary(target, result!!)
+                        }
                         f()
                         listener?.onSucceed(route, result)
                     } catch(e: Throwable) {
@@ -106,6 +114,7 @@ class BinaryRouter(
         is InvalidStateException -> error(ResponseCode.InvalidArgs, error.message ?: "bad request", target, f)
         is UnauthorizedException -> error(ResponseCode.NoPermission, error.message ?: "forbidden", target, f)
         is NotFoundException -> error(ResponseCode.NotFound, error.message ?: "not found", target, f)
+        is HttpException -> error(ResponseCode.MiscError, error.message ?: "error", target, f)
         else -> error(ResponseCode.InternalError, "internal error", target, f)
     }
 
