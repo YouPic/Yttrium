@@ -6,7 +6,7 @@ import com.rimmer.yttrium.emptyString
 import io.netty.buffer.ByteBuf
 
 /** Represents a json token with parsing functionality. */
-class JsonToken(val buffer: ByteBuf, val useByteString: Boolean = false) {
+class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
     enum class Type {
         StartObject,
         EndObject,
