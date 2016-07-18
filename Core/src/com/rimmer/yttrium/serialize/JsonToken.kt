@@ -27,7 +27,19 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
 
     fun expect(type: Type, allowNull: Boolean = false) {
         parse()
-        if(this.type != type || (this.type == Type.NullLit && !allowNull)) {
+
+        // It is very common for js-produced values to contain strings that should be numbers.
+        // We add a conversion here as a special case.
+        if(type === Type.NumberLit && this.type === Type.StringLit) {
+            try {
+                numberPayload = java.lang.Double.parseDouble(stringPayload)
+                this.type = type
+            } catch(e: NumberFormatException) {
+                // If this happens the type will be wrong and we throw an exception later.
+            }
+        }
+
+        if(this.type !== type || (this.type === Type.NullLit && !allowNull)) {
             throw InvalidStateException("Invalid json: Expected $type")
         }
     }
@@ -46,6 +58,13 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
         } else {
             parseValue(b.toChar())
         }
+
+        if(buffer.isReadable) {
+            val c = buffer.getByte(buffer.readerIndex()).toChar()
+            if (c == ',') {
+                buffer.skipBytes(1)
+            }
+        }
     }
 
     fun skipValue() {
@@ -54,7 +73,13 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
     }
 
     fun peekArrayEnd(): Boolean {
+        skipWhitespace()
         return buffer.getByte(buffer.readerIndex()).toChar() == ']'
+    }
+
+    fun peekString(): Boolean {
+        skipWhitespace()
+        return buffer.getByte(buffer.readerIndex()).toChar() == '"'
     }
 
     private fun skipElement() {
@@ -114,13 +139,6 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
             type = Type.NullLit
         } else {
             throw InvalidStateException("Invalid json: expected a value")
-        }
-
-        if(buffer.isReadable) {
-            val c = buffer.getByte(buffer.readerIndex()).toChar()
-            if (c == ',') {
-                buffer.skipBytes(1)
-            }
         }
     }
 
