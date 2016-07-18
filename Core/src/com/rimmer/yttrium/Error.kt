@@ -13,3 +13,6 @@ class UnauthorizedException : Exception("no_permission")
 
 /** This is mapped to 400 and should be thrown whenever a request tries to do something that's impossible in that context. */
 class InvalidStateException(cause: String): Exception(cause)
+
+/** This is mapped to the provided http code and should be thrown for errors that don't fit any other exception. */
+class HttpException(val errorCode: Int, cause: String): Exception(cause)

@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.server.http
 
+import com.rimmer.yttrium.HttpException
 import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
@@ -35,6 +36,7 @@ fun mapError(error: Throwable?) = when(error) {
     is InvalidStateException -> errorResponse(HttpResponseStatus.BAD_REQUEST, error.message ?: "bad request")
     is UnauthorizedException -> errorResponse(HttpResponseStatus.FORBIDDEN, error.message ?: "forbidden")
     is NotFoundException -> errorResponse(HttpResponseStatus.NOT_FOUND, error.message ?: "not found")
+    is HttpException -> errorResponse(HttpResponseStatus.valueOf(error.errorCode), error.message ?: "error")
     else -> errorResponse(HttpResponseStatus.INTERNAL_SERVER_ERROR, "internal error")
 }
 
