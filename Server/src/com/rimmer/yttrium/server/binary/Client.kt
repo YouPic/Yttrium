@@ -19,7 +19,7 @@ interface BinaryClient {
      * @param readResponse A function that reads the call result on success.
      * @param f Called to receive the result.
      */
-    fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit)
+    fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (T?, Throwable?) -> Unit)
 
     /**
      * Calls a route without receiving its result.
@@ -37,7 +37,7 @@ interface BinaryClient {
      * @param f Called to receive the results. This will continue being called until the subscription is closed.
      * @return A subscription id that can be used to unsubscribe.
      */
-    fun <T: Any> subscribe(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit): Int
+    fun <T: Any> subscribe(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (T?, Throwable?) -> Unit): Int
 
     /** Stops receiving messages from the provided subscription id. */
     fun unsubscribe(subscription: Int)
@@ -62,10 +62,10 @@ fun connectBinary(
 })
 
 class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): BinaryDecoder(), BinaryClient {
-    private data class Request(val targetReader: ByteBuf.() -> Any, val handler: ((Any?, Throwable?) -> Unit)?, val isPush: Boolean)
+    private data class Request<T: Any>(val targetReader: ByteBuf.() -> T, val handler: ((T?, Throwable?) -> Unit)?, val isPush: Boolean)
 
     private var context: ChannelHandlerContext? = null
-    private val requests = ArrayList<Request?>()
+    private val requests = ArrayList<Request<in Any>?>()
     private var nextRequest = 0
 
     override val connected: Boolean get() = context != null && context!!.channel().isActive
@@ -88,12 +88,12 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         performRequest(Request(readResponse, null, false), route, writeArgs)
     }
 
-    override fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit) {
-        performRequest(Request(readResponse, f, false), route, writeArgs)
+    override fun <T: Any> call(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (T?, Throwable?) -> Unit) {
+        performRequest(Request(readResponse, f, false) as Request<in Any>, route, writeArgs)
     }
 
-    override fun <T: Any> subscribe(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (Any?, Throwable?) -> Unit): Int {
-        return performRequest(Request(readResponse, null, true), route, writeArgs)
+    override fun <T: Any> subscribe(route: Int, writeArgs: ByteBuf.() -> Unit, readResponse: ByteBuf.() -> T, f: (T?, Throwable?) -> Unit): Int {
+        return performRequest(Request(readResponse, f, true) as Request<in Any>, route, writeArgs)
     }
 
     override fun unsubscribe(subscription: Int) {
@@ -120,7 +120,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         }
     }
 
-    private fun performRequest(r: Request, route: Int, writeArgs: ByteBuf.() -> Unit): Int {
+    private fun performRequest(r: Request<in Any>, route: Int, writeArgs: ByteBuf.() -> Unit): Int {
         val id = addRequest(r)
         writePacket(context!!, id) { target, commit ->
             target.writeVarInt(route)
@@ -130,7 +130,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         return id
     }
 
-    private fun addRequest(r: Request): Int {
+    private fun addRequest(r: Request<in Any>): Int {
         val i = nextRequest
         if(i >= requests.size) {
             requests.add(r)
@@ -149,7 +149,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         nextRequest = request
     }
 
-    private fun mapResponse(request: Request, packet: ByteBuf) {
+    private fun mapResponse(request: Request<in Any>, packet: ByteBuf) {
         val response = packet.readByte().toInt()
         if(response == ResponseCode.Success.ordinal) {
             val result = request.targetReader(packet)
