@@ -11,7 +11,7 @@ fun routeHandler(
     argumentCount: Int,
     call: RouteContext.(Array<Any?>) -> Task<*>
 ) = { context: RouteContext, listener: RouteListener ->
-    val listenerId = listener.onStart(context.eventLoop, route)
+    listener.onStart(context.eventLoop, route)
 
     try {
         val arguments = arrayOfNulls<Any?>(argumentCount)

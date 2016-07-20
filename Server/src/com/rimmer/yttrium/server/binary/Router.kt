@@ -70,15 +70,7 @@ class BinaryRouter(
                     val writerIndex = target.writerIndex()
                     try {
                         target.writeByte(ResponseCode.Success.ordinal)
-                        if(writer === null) {
-                            if(result is Writable) {
-                                result.encodeBinary(target)
-                            } else {
-                                throw IllegalStateException("Unserializable response: $result")
-                            }
-                        } else {
-                            writer.toBinary(target, result!!)
-                        }
+                        writeBinary(result, writer, target)
                         f()
                         listener?.onSucceed(route, result)
                     } catch(e: Throwable) {

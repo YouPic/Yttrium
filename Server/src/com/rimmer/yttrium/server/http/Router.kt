@@ -83,7 +83,7 @@ class HttpRouter(
                 override fun onSucceed(route: RouteContext, result: Any?) {
                     val buffer = context.alloc().buffer()
                     try {
-                        writeJson(result, buffer)
+                        writeJson(result, route.route.writer, buffer)
                         val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer)
                         response.headers().set(HttpHeaderNames.CONTENT_TYPE, jsonContentType)
                         f(response)

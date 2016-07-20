@@ -108,7 +108,7 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ss
     override fun request(method: HttpMethod, path: String, body: Any, f: (FullHttpResponse?, Throwable?) -> Unit) {
         listener = f
         val buffer = ByteBufAllocator.DEFAULT.buffer()
-        writeJson(body, buffer)
+        writeJson(body, null, buffer)
         val request = DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path, buffer)
         context!!.writeAndFlush(request, context!!.voidPromise())
     }
@@ -119,7 +119,7 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ss
         val encoder = HttpPostRequestEncoder(request, false)
         for((k, v) in body) {
             val buffer = ByteBufAllocator.DEFAULT.buffer()
-            writeJson(v, buffer)
+            writeJson(v, null, buffer)
             val attribute = MemoryAttribute(k)
             attribute.setContent(buffer)
             encoder.addBodyHttpData(attribute)
