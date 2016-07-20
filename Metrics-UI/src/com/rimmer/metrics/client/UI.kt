@@ -1,9 +1,9 @@
 package com.rimmer.metrics.client
 
-import com.rimmer.metrics.server.generated.type.StatsPacket
+import com.rimmer.metrics.server.generated.client.getStats
+import com.rimmer.metrics.server.generated.type.StatResponse
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.yttrium.server.binary.connectBinary
-import com.rimmer.yttrium.server.binary.routeHash
 import com.rimmer.yttrium.server.runClient
 import javafx.application.Application
 import javafx.application.Platform
@@ -80,7 +80,7 @@ class MetricsUI: Application() {
     }
 
     fun connect() {
-        connectBinary(context, host, port, 10000) { c, e ->
+        connectBinary(context.acceptorGroup, host, port, 10000) { c, e ->
             Platform.runLater {
                 if(e == null) {
                     server = c!!
@@ -96,16 +96,10 @@ class MetricsUI: Application() {
         val server = server
         if(server == null || !server.connected) return connect()
 
-        StatsPacket.Companion
-        server.call(
-            routeHash("GET /stats/{from}/{to}"),
-            arrayOf(lastUpdate.millis + 1, DateTime.now().millis),
-            arrayOf(password),
-            StatsPacket::class.java
-        ) { r, e ->
+        server.getStats(lastUpdate.millis + 1, DateTime.now().millis, password) { r, e ->
             Platform.runLater {
                 if(e == null) {
-                    onUpdate(r!! as StatsPacket)
+                    onUpdate(r!!)
                 } else {
                     onUpdateError(e)
                 }
@@ -113,7 +107,7 @@ class MetricsUI: Application() {
         }
     }
 
-    fun onUpdate(packet: StatsPacket) {
+    fun onUpdate(packet: StatResponse) {
         println("Received update: $packet")
 
         packet.slices.lastOrNull()?.let {
