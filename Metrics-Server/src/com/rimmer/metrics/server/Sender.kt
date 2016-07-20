@@ -4,21 +4,18 @@ import com.rimmer.metrics.Sender
 import com.rimmer.metrics.generated.type.ErrorPacket
 import com.rimmer.metrics.generated.type.ProfilePacket
 import com.rimmer.metrics.generated.type.StatPacket
+import com.rimmer.metrics.server.generated.client.error
+import com.rimmer.metrics.server.generated.client.profile
+import com.rimmer.metrics.server.generated.client.statistic
 import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.yttrium.server.binary.connectBinary
-import com.rimmer.yttrium.server.binary.routeHash
-import org.joda.time.DateTime
 
 /** Minimum time between connect attempts in milliseconds. */
 val reconnectTimeout = 10000L
 
 /** Sends received metrics to a metrics server. */
 class ServerSender(val context: ServerContext, val host: String, val port: Int = 1338): Sender {
-    val statisticRoute = routeHash("POST /statistic")
-    val profileRoute = routeHash("POST /profile")
-    val errorRoute = routeHash("POST /error")
-
     var client: BinaryClient? = null
     var lastTry = 0L
 
@@ -28,17 +25,17 @@ class ServerSender(val context: ServerContext, val host: String, val port: Int =
 
     override fun sendStatistic(stat: StatPacket) {
         ensureClient()
-        client?.call(statisticRoute, emptyArray(), arrayOf(stat), Unit::class.java)
+        client?.statistic(stat) { r, e -> }
     }
 
     override fun sendProfile(profile: ProfilePacket) {
         ensureClient()
-        client?.call(profileRoute, emptyArray(), arrayOf(profile), Unit::class.java)
+        client?.profile(profile) { r, e -> }
     }
 
     override fun sendError(error: ErrorPacket) {
         ensureClient()
-        client?.call(errorRoute, emptyArray(), arrayOf(error), Unit::class.java)
+        client?.error(error) { r, e -> }
     }
 
     private fun ensureClient() {
@@ -50,7 +47,7 @@ class ServerSender(val context: ServerContext, val host: String, val port: Int =
             if(time - lastTry < reconnectTimeout * 1000000) return
             lastTry = time
 
-            connectBinary(context, host, port) { c, e ->
+            connectBinary(context.handlerGroup, host, port) { c, e ->
                 if(e == null) {
                     println("Connected to metrics server.")
                 } else {

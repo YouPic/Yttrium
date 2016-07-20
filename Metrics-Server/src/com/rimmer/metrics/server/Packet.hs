@@ -14,11 +14,11 @@ data StatSlice where
     global: StatEntry
     paths: {String -> StatEntry}
 
-data StatsPacket where
+data StatResponse where
     slices: {StatSlice}
 
 -- Profiling data types.
-data Event where
+data ProfileEvent where
     group: String
     event: String
     startTime: Long
@@ -27,7 +27,7 @@ data Event where
 data ProfileEntry where
     start: Long
     end: Long
-    events: {Event}
+    events: {ProfileEvent}
 
 data ProfileStat where
     normal: ProfileEntry
@@ -37,7 +37,7 @@ data ProfileSlice where
     time: Date
     paths: {String -> ProfileStat}
 
-data ProfilesPacket where
+data ProfileResponse where
     slices: {ProfileSlice}
 
 data Error where
@@ -47,5 +47,5 @@ data Error where
     cause: String
     trace: String
 
-data ErrorPacket where
+data ErrorResponse where
     errors: {Error}

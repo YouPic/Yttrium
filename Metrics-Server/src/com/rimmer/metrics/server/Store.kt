@@ -4,7 +4,6 @@ import com.rimmer.metrics.generated.type.*
 import com.rimmer.metrics.generated.type.ErrorPacket
 import com.rimmer.metrics.generated.type.Event
 import com.rimmer.metrics.server.generated.type.*
-import com.rimmer.metrics.server.generated.type.ErrorPacket as ClientError
 import org.joda.time.DateTime
 import java.util.*
 
@@ -85,7 +84,7 @@ fun statEntry(it: PathMetric) = StatEntry(
 )
 
 fun profileEntry(it: ProfilePoint?) = ProfileEntry(it?.startTime ?: 0, it?.endTime ?: 0, it?.events?.map {
-    com.rimmer.metrics.server.generated.type.Event(it.event.name, it.type, it.startTime, it.endTime)
+    ProfileEvent(it.event.name, it.type, it.startTime, it.endTime)
 } ?: emptyList())
 
 fun profileStat(it: PathProfile) = ProfileStat(profileEntry(it.normal), profileEntry(it.max))
@@ -98,9 +97,9 @@ class MetricStore {
     val profileMap = HashMap<Long, Profile>()
     val errorMap = HashMap<String, HashMap<String, ErrorClass>>()
 
-    @Synchronized fun getStats(from: Long, to: Long): StatsPacket {
+    @Synchronized fun getStats(from: Long, to: Long): StatResponse {
         if(inFlightTimes.isEmpty()) {
-            return StatsPacket(emptyList())
+            return StatResponse(emptyList())
         }
 
         val first = if(inFlightTimes.first().time.millis >= from) {
@@ -120,14 +119,14 @@ class MetricStore {
         val list = inFlightTimes.subList(first, last)
         println("Returning stats with ${list.size} slices.")
 
-        return StatsPacket(list.map {
+        return StatResponse(list.map {
             StatSlice(it.time, statEntry(it), it.paths.mapValues {statEntry(it.value)})
         })
     }
 
-    @Synchronized fun getProfiles(from: Long, to: Long): ProfilesPacket {
+    @Synchronized fun getProfiles(from: Long, to: Long): ProfileResponse {
         if(inFlightProfiles.isEmpty()) {
-            return ProfilesPacket(emptyList())
+            return ProfileResponse(emptyList())
         }
 
         val first = if(inFlightProfiles.first().time.millis >= from) {
@@ -147,14 +146,14 @@ class MetricStore {
         val list = inFlightProfiles.subList(first, last)
         println("Returning stats with ${list.size} slices.")
 
-        return ProfilesPacket(list.map {
+        return ProfileResponse(list.map {
             ProfileSlice(it.time, it.paths.mapValues {profileStat(it.value)})
         })
     }
 
-    @Synchronized fun getErrors(from: Long): ClientError {
+    @Synchronized fun getErrors(from: Long): ErrorResponse {
         val errors = errorMap.mapValues {it.value.filterValues {it.lastOccurrence.millis > from}}
-        return ClientError(errors.flatMap { it.value.map {
+        return ErrorResponse(errors.flatMap { it.value.map {
             Error(it.key, it.value.lastOccurrence, it.value.count, it.value.cause, it.value.trace)
         }})
     }
