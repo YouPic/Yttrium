@@ -33,7 +33,7 @@ class Router(plugins: List<Plugin<in Any>>) {
         funQueries: Iterable<BuilderQuery>,
         plugins: List<Plugin<in Any>>,
         readers: Array<Reader?>,
-        writer: Writer<Any>?,
+        writer: Writer<*>?,
         call: RouteContext.(Array<Any?>) -> Task<*>
     ) {
         val segments = funSegments.toMutableList()

@@ -58,7 +58,7 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.github.Le-Chiffre</groupId>
+            <groupId>com.github.RimmerM</groupId>
             <artifactId>MySQL-Async</artifactId>
             <version>-SNAPSHOT</version>
         </dependency>

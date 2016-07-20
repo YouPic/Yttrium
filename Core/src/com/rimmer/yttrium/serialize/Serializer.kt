@@ -299,7 +299,7 @@ data class RawString(val value: String): Writable {
  */
 data class BodyContent(val value: ByteBuf)
 
-fun writeJson(value: Any?, writer: Writer<Any>?, target: ByteBuf) {
+fun writeJson(value: Any?, writer: Writer<*>?, target: ByteBuf) {
     val json = JsonWriter(target)
     if(writer === null) {
         if(value is Writable) value.encodeJson(json)
@@ -308,18 +308,18 @@ fun writeJson(value: Any?, writer: Writer<Any>?, target: ByteBuf) {
             json.endObject()
         } else throw IllegalStateException("Value $value is not serializable.")
     } else if(value !== null) {
-        writer.toJson(json, value)
+        (writer as Writer<Any>).toJson(json, value)
     } else {
         json.nullValue()
     }
 }
 
-fun writeBinary(value: Any?, writer: Writer<Any>?, target: ByteBuf) {
+fun writeBinary(value: Any?, writer: Writer<*>?, target: ByteBuf) {
     if(writer === null) {
         if(value is Writable) value.encodeBinary(target)
         else if(value !is Unit) throw IllegalStateException("Value $value is not serializable.")
     } else if(value !== null) {
-        writer.toBinary(target, value)
+        (writer as Writer<Any>).toBinary(target, value)
     }
 }
 

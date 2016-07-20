@@ -27,7 +27,7 @@ class Route(
     val segments: Array<PathSegment>,
     val typedSegments: Array<PathSegment>,
     val queries: Array<RouteQuery>,
-    val writer: Writer<Any>?,
+    val writer: Writer<*>?,
     val bodyQuery: Int?,
     var handler: (RouteContext, RouteListener) -> Unit = {c, r ->}
 )
