@@ -14,9 +14,9 @@ data class ProfileStat(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(normalFieldName)
-        this.normal.encodeJson(writer)
+        normal.encodeJson(writer)
         writer.field(maxFieldName)
-        this.max.encodeJson(writer)
+        max.encodeJson(writer)
         writer.endObject()
     }
 

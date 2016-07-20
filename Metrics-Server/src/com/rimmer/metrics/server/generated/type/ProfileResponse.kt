@@ -14,7 +14,7 @@ data class ProfileResponse(
         writer.startObject()
         writer.field(slicesFieldName)
         writer.startArray()
-        for(o in this.slices) {
+        for(o in slices) {
             writer.arrayField()
             o.encodeJson(writer)
         }
@@ -35,7 +35,7 @@ data class ProfileResponse(
         val reader = Reader(ProfileResponse::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): ProfileResponse {
-            val slices: ArrayList<ProfileSlice> = ArrayList()
+            var slices: ArrayList<ProfileSlice> = ArrayList()
 
             buffer.readObject {
                 when(it) {
@@ -43,7 +43,7 @@ data class ProfileResponse(
                         val length_slices = buffer.readVarLong() ushr 3
                         var i_slices = 0
                         while(i_slices < length_slices) {
-                            slices.add(ProfileSlice.fromBinary(buffer))
+                            slices!!.add(ProfileSlice.fromBinary(buffer))
                             i_slices++
                         }
                         true
@@ -56,7 +56,7 @@ data class ProfileResponse(
         }
 
         fun fromJson(token: JsonToken): ProfileResponse {
-            val slices: ArrayList<ProfileSlice> = ArrayList()
+            var slices: ArrayList<ProfileSlice> = ArrayList()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {

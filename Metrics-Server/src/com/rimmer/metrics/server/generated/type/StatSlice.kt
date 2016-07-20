@@ -15,12 +15,12 @@ data class StatSlice(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(timeFieldName)
-        writer.value(this.time)
+        writer.value(time)
         writer.field(globalFieldName)
-        this.global.encodeJson(writer)
+        global.encodeJson(writer)
         writer.field(pathsFieldName)
         writer.startObject()
-        for(kv in this.paths) {
+        for(kv in paths) {
             writer.field(kv.key)
             kv.value.encodeJson(writer)
         }

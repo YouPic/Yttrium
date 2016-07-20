@@ -15,12 +15,12 @@ data class ProfileEntry(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(startFieldName)
-        writer.value(this.start)
+        writer.value(start)
         writer.field(endFieldName)
-        writer.value(this.end)
+        writer.value(end)
         writer.field(eventsFieldName)
         writer.startArray()
-        for(o in this.events) {
+        for(o in events) {
             writer.arrayField()
             o.encodeJson(writer)
         }
@@ -45,7 +45,7 @@ data class ProfileEntry(
         fun fromBinary(buffer: ByteBuf): ProfileEntry {
             var start: Long = 0L
             var end: Long = 0L
-            val events: ArrayList<ProfileEvent> = ArrayList()
+            var events: ArrayList<ProfileEvent> = ArrayList()
 
             buffer.readObject {
                 when(it) {
@@ -61,7 +61,7 @@ data class ProfileEntry(
                         val length_events = buffer.readVarLong() ushr 3
                         var i_events = 0
                         while(i_events < length_events) {
-                            events.add(ProfileEvent.fromBinary(buffer))
+                            events!!.add(ProfileEvent.fromBinary(buffer))
                             i_events++
                         }
                         true
@@ -76,7 +76,7 @@ data class ProfileEntry(
         fun fromJson(token: JsonToken): ProfileEntry {
             var start: Long = 0L
             var end: Long = 0L
-            val events: ArrayList<ProfileEvent> = ArrayList()
+            var events: ArrayList<ProfileEvent> = ArrayList()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {

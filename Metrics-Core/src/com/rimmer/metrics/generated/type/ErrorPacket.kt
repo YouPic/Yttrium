@@ -15,13 +15,13 @@ data class ErrorPacket(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(pathFieldName)
-        writer.value(this.path)
+        writer.value(path)
         writer.field(timeFieldName)
-        writer.value(this.time)
+        writer.value(time)
         writer.field(causeFieldName)
-        writer.value(this.cause)
+        writer.value(cause)
         writer.field(traceFieldName)
-        writer.value(this.trace)
+        writer.value(trace)
         writer.endObject()
     }
 

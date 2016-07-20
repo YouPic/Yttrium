@@ -16,13 +16,13 @@ data class ProfileEvent(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(groupFieldName)
-        writer.value(this.group)
+        writer.value(group)
         writer.field(eventFieldName)
-        writer.value(this.event)
+        writer.value(event)
         writer.field(startTimeFieldName)
-        writer.value(this.startTime)
+        writer.value(startTime)
         writer.field(endTimeFieldName)
-        writer.value(this.endTime)
+        writer.value(endTime)
         writer.endObject()
     }
 

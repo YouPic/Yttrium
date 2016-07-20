@@ -14,10 +14,10 @@ data class ProfileSlice(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(timeFieldName)
-        writer.value(this.time)
+        writer.value(time)
         writer.field(pathsFieldName)
         writer.startObject()
-        for(kv in this.paths) {
+        for(kv in paths) {
             writer.field(kv.key)
             kv.value.encodeJson(writer)
         }

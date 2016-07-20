@@ -13,9 +13,9 @@ data class Interval(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(startFieldName)
-        writer.value(this.start)
+        writer.value(start)
         writer.field(endFieldName)
-        writer.value(this.end)
+        writer.value(end)
         writer.endObject()
     }
 

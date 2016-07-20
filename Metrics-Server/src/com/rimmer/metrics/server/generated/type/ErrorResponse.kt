@@ -14,7 +14,7 @@ data class ErrorResponse(
         writer.startObject()
         writer.field(errorsFieldName)
         writer.startArray()
-        for(o in this.errors) {
+        for(o in errors) {
             writer.arrayField()
             o.encodeJson(writer)
         }
@@ -43,7 +43,7 @@ data class ErrorResponse(
                         val length_errors = buffer.readVarLong() ushr 3
                         var i_errors = 0
                         while(i_errors < length_errors) {
-                            errors.add(Error.fromBinary(buffer))
+                            errors!!.add(Error.fromBinary(buffer))
                             i_errors++
                         }
                         true

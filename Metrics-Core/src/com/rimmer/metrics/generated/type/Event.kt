@@ -15,13 +15,13 @@ data class Event(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(eventFieldName)
-        this.event.encodeJson(writer)
+        event.encodeJson(writer)
         writer.field(typeFieldName)
-        writer.value(this.type)
+        writer.value(type)
         writer.field(startTimeFieldName)
-        writer.value(this.startTime)
+        writer.value(startTime)
         writer.field(endTimeFieldName)
-        writer.value(this.endTime)
+        writer.value(endTime)
         writer.endObject()
     }
 

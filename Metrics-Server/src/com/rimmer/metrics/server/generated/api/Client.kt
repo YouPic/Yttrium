@@ -12,38 +12,38 @@ import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.metrics.server.generated.type.*
 
 inline fun Router.clientApi(
-    crossinline getStats: RouteContext.(from: Long, to: Long, password: String) -> Task<StatResponse>,
-    crossinline getProfile: RouteContext.(from: Long, to: Long, password: String) -> Task<ProfileResponse>,
-    crossinline getError: RouteContext.(from: Long, password: String) -> Task<ErrorResponse>
+    crossinline getStats: RouteContext.(from: Long, to: Long) -> Task<StatResponse>,
+    crossinline getProfile: RouteContext.(from: Long, to: Long) -> Task<ProfileResponse>,
+    crossinline getError: RouteContext.(from: Long) -> Task<ErrorResponse>
 ) {
     addRoute(
         HttpMethod.GET, 0, 
-        emptyList<RouteProperty>(), 
+        listOf(RouteProperty("password", true)), 
         listOf(PathSegment("stats", null), PathSegment("from", longReader), PathSegment("to", longReader)), 
-        listOf(BuilderQuery("password", false, null, "")), 
-        emptyList<Plugin<Any>>(), 
-        arrayOf(longReader, longReader, stringReader), 
+        emptyList<BuilderQuery>(), 
+        listOf(pluginMap["PasswordPlugin"]!!), 
+        arrayOf(longReader, longReader), 
         null, 
-        { getStats(it[0] as Long, it[1] as Long, it[2] as String) }
+        { getStats(it[0] as Long, it[1] as Long) }
     )
     addRoute(
         HttpMethod.GET, 0, 
-        emptyList<RouteProperty>(), 
+        listOf(RouteProperty("password", true)), 
         listOf(PathSegment("profile", null), PathSegment("from", longReader), PathSegment("to", longReader)), 
-        listOf(BuilderQuery("password", false, null, "")), 
-        emptyList<Plugin<Any>>(), 
-        arrayOf(longReader, longReader, stringReader), 
+        emptyList<BuilderQuery>(), 
+        listOf(pluginMap["PasswordPlugin"]!!), 
+        arrayOf(longReader, longReader), 
         null, 
-        { getProfile(it[0] as Long, it[1] as Long, it[2] as String) }
+        { getProfile(it[0] as Long, it[1] as Long) }
     )
     addRoute(
         HttpMethod.GET, 0, 
-        emptyList<RouteProperty>(), 
+        listOf(RouteProperty("password", true)), 
         listOf(PathSegment("error", null), PathSegment("from", longReader)), 
-        listOf(BuilderQuery("password", false, null, "")), 
-        emptyList<Plugin<Any>>(), 
-        arrayOf(longReader, stringReader), 
+        emptyList<BuilderQuery>(), 
+        listOf(pluginMap["PasswordPlugin"]!!), 
+        arrayOf(longReader), 
         null, 
-        { getError(it[0] as Long, it[1] as String) }
+        { getError(it[0] as Long) }
     )
 }

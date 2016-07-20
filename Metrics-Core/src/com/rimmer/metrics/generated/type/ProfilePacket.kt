@@ -17,18 +17,18 @@ data class ProfilePacket(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(pathFieldName)
-        writer.value(this.path)
+        writer.value(path)
         writer.field(serverFieldName)
-        writer.value(this.server)
+        writer.value(server)
         writer.field(timeFieldName)
-        writer.value(this.time)
+        writer.value(time)
         writer.field(startFieldName)
-        writer.value(this.start)
+        writer.value(start)
         writer.field(endFieldName)
-        writer.value(this.end)
+        writer.value(end)
         writer.field(eventsFieldName)
         writer.startArray()
-        for(o in this.events) {
+        for(o in events) {
             writer.arrayField()
             o.encodeJson(writer)
         }
@@ -87,7 +87,7 @@ data class ProfilePacket(
                         val length_events = buffer.readVarLong() ushr 3
                         var i_events = 0
                         while(i_events < length_events) {
-                            events.add(Event.fromBinary(buffer))
+                            events!!.add(Event.fromBinary(buffer))
                             i_events++
                         }
                         true

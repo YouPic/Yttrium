@@ -14,7 +14,7 @@ data class StatResponse(
         writer.startObject()
         writer.field(slicesFieldName)
         writer.startArray()
-        for(o in this.slices) {
+        for(o in slices) {
             writer.arrayField()
             o.encodeJson(writer)
         }
@@ -35,7 +35,7 @@ data class StatResponse(
         val reader = Reader(StatResponse::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): StatResponse {
-            val slices: ArrayList<StatSlice> = ArrayList()
+            var slices: ArrayList<StatSlice> = ArrayList()
 
             buffer.readObject {
                 when(it) {
@@ -43,7 +43,7 @@ data class StatResponse(
                         val length_slices = buffer.readVarLong() ushr 3
                         var i_slices = 0
                         while(i_slices < length_slices) {
-                            slices.add(StatSlice.fromBinary(buffer))
+                            slices!!.add(StatSlice.fromBinary(buffer))
                             i_slices++
                         }
                         true
@@ -56,7 +56,7 @@ data class StatResponse(
         }
 
         fun fromJson(token: JsonToken): StatResponse {
-            val slices: ArrayList<StatSlice> = ArrayList()
+            var slices: ArrayList<StatSlice> = ArrayList()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {

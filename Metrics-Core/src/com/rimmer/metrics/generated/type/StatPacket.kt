@@ -16,16 +16,16 @@ data class StatPacket(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(pathFieldName)
-        writer.value(this.path)
+        writer.value(path)
         writer.field(serverFieldName)
-        writer.value(this.server)
+        writer.value(server)
         writer.field(timeFieldName)
-        writer.value(this.time)
+        writer.value(time)
         writer.field(totalElapsedFieldName)
-        writer.value(this.totalElapsed)
+        writer.value(totalElapsed)
         writer.field(intervalsFieldName)
         writer.startArray()
-        for(o in this.intervals) {
+        for(o in intervals) {
             writer.arrayField()
             o.encodeJson(writer)
         }
@@ -78,7 +78,7 @@ data class StatPacket(
                         val length_intervals = buffer.readVarLong() ushr 3
                         var i_intervals = 0
                         while(i_intervals < length_intervals) {
-                            intervals.add(Interval.fromBinary(buffer))
+                            intervals!!.add(Interval.fromBinary(buffer))
                             i_intervals++
                         }
                         true

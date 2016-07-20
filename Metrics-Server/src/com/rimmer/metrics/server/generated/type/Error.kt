@@ -17,15 +17,15 @@ data class Error(
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(pathFieldName)
-        writer.value(this.path)
+        writer.value(path)
         writer.field(latestFieldName)
-        writer.value(this.latest)
+        writer.value(latest)
         writer.field(countFieldName)
-        writer.value(this.count)
+        writer.value(count)
         writer.field(causeFieldName)
-        writer.value(this.cause)
+        writer.value(cause)
         writer.field(traceFieldName)
-        writer.value(this.trace)
+        writer.value(trace)
         writer.endObject()
     }
 
