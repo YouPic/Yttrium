@@ -178,7 +178,6 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
     override fun slice(start: Int, end: Int) = NativeByteString(buffer, buffer.position() + start, start - end)
 
     override fun utf16(): String {
-        val start = buffer.position()
         val string = ByteArray(size)
         for(i in 0..size-1) {
             string[i] = this[i]

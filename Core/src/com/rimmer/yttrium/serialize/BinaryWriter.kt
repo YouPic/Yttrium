@@ -13,8 +13,9 @@ fun ByteBuf.writeByteString(s: ByteString) {
 }
 
 fun ByteBuf.writeString(s: String) {
-    writeVarInt(s.length)
-    writeBytes(s.toByteArray(Charsets.UTF_8))
+    val bytes = s.toByteArray(Charsets.UTF_8)
+    writeVarInt(bytes.size)
+    writeBytes(bytes)
 }
 
 fun ByteBuf.writeBinary(b: ByteBuf) {

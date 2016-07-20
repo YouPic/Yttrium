@@ -2,6 +2,7 @@ package com.rimmer.yttrium.serialize
 
 import com.rimmer.yttrium.*
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
 import org.joda.time.DateTime
 import org.joda.time.DateTimeZone
 import java.util.*
@@ -12,29 +13,92 @@ import java.util.*
  */
 interface Writable {
     /** Encodes the value as json and stores it in the provided buffer. */
-    fun encodeJson(buffer: ByteBuf)
+    fun encodeJson(writer: JsonWriter)
 
     /** Encodes the value as binary data and stores it in the provided buffer. */
     fun encodeBinary(buffer: ByteBuf)
 }
 
-class Writer<T>(val toJson: JsonWriter.(T) -> Unit, val toBinary: ByteBuf.(T) -> Unit)
+class Writer<in T>(val toJson: JsonWriter.(T) -> Unit, val toBinary: ByteBuf.(T) -> Unit, val type: Int)
 class Reader(val target: Class<*>, val fromJson: (JsonToken) -> Any, val fromBinary: (ByteBuf) -> Any)
 
-val intWriter = Writer<Int>({ value(it) }, { writeVarInt(it) })
-val longWriter = Writer<Long>({ value(it) }, { writeVarLong(it) })
-val byteStringWriter = Writer<ByteString>({ value(it) }, { writeByteString(it) })
-val stringWriter = Writer<String>({ value(it) }, { writeString(it) })
-val dateTimeWriter = Writer<DateTime>({ value(it) }, { writeVarLong(it.millis) })
-val dateWriter = Writer<Date>({ value(it.time) }, { writeVarLong(it.time) })
-val enumWriter = Writer<Enum<*>>({ value(it.name) }, { writeVarInt(it.ordinal) })
-val booleanWriter = Writer<Boolean>({ value(it) }, { writeBoolean(it) })
-val floatWriter = Writer<Float>({ value(it) }, { writeFloat(it) })
-val doubleWriter = Writer<Double>({ value(it) }, { writeDouble(it) })
-val charWriter = Writer<Char>({ value(it.toString()) }, { writeString(it.toString()) })
-val byteWriter = Writer<Byte>({ value(it) }, { writeVarInt(it.toInt()) })
-val shortWriter = Writer<Short>({ value(it) }, { writeVarInt(it.toInt()) })
-val unitWriter = Writer<Unit>({ startObject().endObject() }, {})
+val intWriter = Writer<Int>({ value(it) }, { writeVarInt(it) }, FieldType.VarInt)
+val longWriter = Writer<Long>({ value(it) }, { writeVarLong(it) }, FieldType.VarInt)
+val byteStringWriter = Writer<ByteString>({ value(it) }, { writeByteString(it) }, FieldType.LengthEncoded)
+val stringWriter = Writer<String>({ value(it) }, { writeString(it) }, FieldType.LengthEncoded)
+val dateTimeWriter = Writer<DateTime>({ value(it) }, { writeVarLong(it.millis) }, FieldType.VarInt)
+val dateWriter = Writer<Date>({ value(it.time) }, { writeVarLong(it.time) }, FieldType.VarInt)
+val enumWriter = Writer<Enum<*>>({ value(it.name) }, { writeVarInt(it.ordinal) }, FieldType.VarInt)
+val booleanWriter = Writer<Boolean>({ value(it) }, { writeBoolean(it) }, FieldType.VarInt)
+val floatWriter = Writer<Float>({ value(it) }, { writeFloat(it) }, FieldType.Fixed32)
+val doubleWriter = Writer<Double>({ value(it) }, { writeDouble(it) }, FieldType.Fixed64)
+val charWriter = Writer<Char>({ value(it.toString()) }, { writeString(it.toString()) }, FieldType.LengthEncoded)
+val byteWriter = Writer<Byte>({ value(it) }, { writeVarInt(it.toInt()) }, FieldType.VarInt)
+val shortWriter = Writer<Short>({ value(it) }, { writeVarInt(it.toInt()) }, FieldType.VarInt)
+val unitWriter = Writer<Unit>({ startObject().endObject() }, {}, FieldType.Object)
+val binaryWriter = Writer<ByteBuf>({ value(it.string) }, { writeVarInt(it.readableBytes()); writeBytes(it) }, FieldType.LengthEncoded)
+
+fun <T> arrayWriter(writer: Writer<T>?) = if(writer === null) {
+    Writer<List<T>>({
+        startArray()
+        for(i in it) {
+            (i as Writable).encodeJson(this)
+        }
+        endArray()
+    }, {
+        writeArray(FieldType.Object, it) {
+            (it as Writable).encodeBinary(this)
+        }
+    }, FieldType.Array)
+} else {
+    Writer<List<T>>({
+        startArray()
+        for(i in it) {
+            writer.toJson(this, i)
+        }
+        endArray()
+    }, {
+        writeArray(writer.type, it) {
+            writer.toBinary(this, it)
+        }
+    }, FieldType.Array)
+}
+
+fun <V> mapWriter(writer: Writer<V>?) = if(writer == null) {
+    Writer<Map<String, V>>({
+        startObject()
+        for(i in it) {
+            field(i.key)
+            (i.value as Writable).encodeJson(this)
+        }
+        endObject()
+    }, {
+        writeMap(FieldType.LengthEncoded, FieldType.Object, it, {
+            writeString(it)
+        }, {
+            (it as Writable).encodeBinary(this)
+        })
+    }, FieldType.Map)
+} else {
+    Writer<Map<String, V>>({
+        startObject()
+        for(i in it) {
+            field(i.key)
+            writer.toJson(this, i.value)
+        }
+        endObject()
+    }, {
+        writeMap(FieldType.LengthEncoded, writer.type, it, {
+            writeString(it)
+        }, {
+            writer.toBinary(this, it)
+        })
+    }, FieldType.Map)
+}
+
+
+
+
 
 val intReader = Reader(Int::class.javaObjectType, {
     it.expect(JsonToken.Type.NumberLit)
@@ -143,13 +207,75 @@ val dateReader = Reader(Date::class.java, {
     Date(it.readVarLong())
 })
 
+val binaryReader = Reader(ByteBuf::class.java, {
+    val byte = it.useByteString
+    it.useByteString = true
+    it.expect(JsonToken.Type.StringLit)
+    it.useByteString = byte
+    Unpooled.wrappedBuffer(it.byteStringPayload.toByteArray())
+}, {
+    val length = it.readVarInt()
+    it.readBytes(length)
+})
+
+fun <T> arrayReader(element: Reader) = Reader(List::class.java, {
+    val list = ArrayList<T>()
+    it.expect(JsonToken.Type.StartArray)
+    while(!it.peekArrayEnd()) {
+        list.add(element.fromJson(it) as T)
+    }
+    it.expect(JsonToken.Type.EndArray)
+    list
+}, {
+    val list = ArrayList<T>()
+    val length = it.readVarLong() ushr 3
+    var index = 0
+    while(index < length) {
+        list.add(element.fromBinary(it) as T)
+        index++
+    }
+    list
+})
+
+fun <V> mapReader(element: Reader) = Reader(Map::class.java, {
+    val map = HashMap<String, V>()
+    val bytes = it.useByteString
+    it.useByteString = false
+    it.expect(JsonToken.Type.StartObject)
+    while(true) {
+        it.parse()
+        if(it.type === JsonToken.Type.EndObject) {
+            break
+        } else if(it.type === JsonToken.Type.FieldName) {
+            val key = it.stringPayload
+            val value = element.fromJson(it) as V
+            map[key] = value
+        } else {
+            throw InvalidStateException("Invalid json: expected field or object end")
+        }
+    }
+
+    it.expect(JsonToken.Type.EndObject)
+    it.useByteString = bytes
+    map
+}, {
+    val map = HashMap<String, V>()
+    val length = it.readVarLong() ushr 6
+    var index = 0
+    while(index < length) {
+        map[it.readString()] = element.fromBinary(it) as V
+        index++
+    }
+    map
+})
+
 /**
  * This is a special wrapper around String,
  * which when stored will contain the raw string instead of being serialized to json.
  */
 data class RawString(val value: String): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        buffer.writeBytes(value.toByteArray())
+    override fun encodeJson(writer: JsonWriter) {
+        writer.buffer.writeBytes(value.toByteArray())
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
@@ -173,54 +299,27 @@ data class RawString(val value: String): Writable {
  */
 data class BodyContent(val value: ByteBuf)
 
-/**
- * Stores a value as json.
- * The value must be either a Writable type, or any of the following builtin types:
- * Boolean, Byte, Short, Int, Long, Float, Double, DateTime, Char, String, Enum.
- */
-fun writeJson(value: Any?, target: ByteBuf) {
-    if(value is Writable) {
-        value.encodeJson(target)
+fun writeJson(value: Any?, writer: Writer<Any>?, target: ByteBuf) {
+    val json = JsonWriter(target)
+    if(writer === null) {
+        if(value is Writable) value.encodeJson(json)
+        else if(value is Unit) {
+            json.startObject()
+            json.endObject()
+        } else throw IllegalStateException("Value $value is not serializable.")
+    } else if(value !== null) {
+        writer.toJson(json, value)
     } else {
-        val writer = JsonWriter(target)
-        when(value) {
-            null -> writer.nullValue()
-            is Int -> writer.value(value)
-            is Long -> writer.value(value)
-            is ByteString -> writer.value(value)
-            is String -> writer.value(value)
-            is DateTime -> writer.value(value)
-            is Enum<*> -> writer.value(value.name)
-            is Boolean -> writer.value(value)
-            is Float -> writer.value(value)
-            is Double -> writer.value(value)
-            is Char -> writer.value(value.toString())
-            is Byte -> writer.value(value)
-            is Short -> writer.value(value)
-            is Unit -> writer.startObject().endObject()
-            is Collection<*> -> {
-                writer.startArray()
-                for(i in value) {
-                    writer.arrayField()
-                    writeJson(i, target)
-                }
-                writer.endArray()
-            }
-            is Map<*, *> -> {
-                writer.startObject()
-                for(kv in value) {
-                    val k = kv.key
-                    when(k) {
-                        is String -> writer.field(k)
-                        is ByteArray -> writer.field(k)
-                        else -> throw IllegalArgumentException("JSON map keys must be String or ByteArray")
-                    }
-                    writeJson(kv.value, target)
-                }
-                writer.endObject()
-            }
-            else -> throw IllegalArgumentException("Value $value cannot be serialized.")
-        }
+        json.nullValue()
+    }
+}
+
+fun writeBinary(value: Any?, writer: Writer<Any>?, target: ByteBuf) {
+    if(writer === null) {
+        if(value is Writable) value.encodeBinary(target)
+        else if(value !is Unit) throw IllegalStateException("Value $value is not serializable.")
+    } else if(value !== null) {
+        writer.toBinary(target, value)
     }
 }
 
