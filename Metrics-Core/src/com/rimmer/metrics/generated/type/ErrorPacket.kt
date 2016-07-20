@@ -12,77 +12,66 @@ data class ErrorPacket(
     val cause: String,
     val trace: String
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(pathFieldName)
-        encoder.value(path)
-        encoder.field(timeFieldName)
-        encoder.value(time)
-        encoder.field(causeFieldName)
-        encoder.value(cause)
-        encoder.field(traceFieldName)
-        encoder.value(trace)
-        encoder.endObject()
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(pathFieldName)
+        writer.value(this.path)
+        writer.field(timeFieldName)
+        writer.value(this.time)
+        writer.field(causeFieldName)
+        writer.value(this.cause)
+        writer.field(traceFieldName)
+        writer.value(this.trace)
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 18528
+        buffer.writeVarInt(header0)
         buffer.writeString(path)
-        buffer.writeFieldId(2)
         buffer.writeVarLong(time.millis)
-        buffer.writeFieldId(3)
         buffer.writeString(cause)
-        buffer.writeFieldId(4)
         buffer.writeString(trace)
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(ErrorPacket::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val pathFieldName = "path".toByteArray()
-        val pathFieldHash = "path".hashCode()
-        val timeFieldName = "time".toByteArray()
-        val timeFieldHash = "time".hashCode()
-        val causeFieldName = "cause".toByteArray()
-        val causeFieldHash = "cause".hashCode()
-        val traceFieldName = "trace".toByteArray()
-        val traceFieldHash = "trace".hashCode()
+        val reader = Reader(ErrorPacket::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): ErrorPacket {
             var path: String? = null
             var time: DateTime? = null
             var cause: String? = null
             var trace: String? = null
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         path = buffer.readString()
+                        true
+                    }
+                    1 -> {
+                        time = buffer.readVarLong().let {DateTime(it)}
+                        true
                     }
                     2 -> {
-                        time = buffer.readVarLong().let {DateTime(it)}
+                        cause = buffer.readString()
+                        true
                     }
                     3 -> {
-                        cause = buffer.readString()
-                    }
-                    4 -> {
                         trace = buffer.readString()
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(path == null || time == null || cause == null || trace == null) {
                 throw InvalidStateException("ErrorPacket instance is missing required fields")
             }
-            return ErrorPacket(path, time, cause, trace)
+            return ErrorPacket(path!!, time!!, cause!!, trace!!)
         }
 
-        fun fromJson(buffer: ByteBuf): ErrorPacket {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): ErrorPacket {
             var path: String? = null
             var time: DateTime? = null
             var cause: String? = null
@@ -111,6 +100,7 @@ data class ErrorPacket(
                             token.expect(JsonToken.Type.StringLit)
                             trace = token.stringPayload
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

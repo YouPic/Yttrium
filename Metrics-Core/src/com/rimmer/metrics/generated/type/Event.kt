@@ -12,77 +12,66 @@ data class Event(
     val startTime: Long,
     val endTime: Long
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(eventFieldName)
-        event.encodeJson(buffer)
-        encoder.field(typeFieldName)
-        encoder.value(type)
-        encoder.field(startTimeFieldName)
-        encoder.value(startTime)
-        encoder.field(endTimeFieldName)
-        encoder.value(endTime)
-        encoder.endObject()
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(eventFieldName)
+        this.event.encodeJson(writer)
+        writer.field(typeFieldName)
+        writer.value(this.type)
+        writer.field(startTimeFieldName)
+        writer.value(this.startTime)
+        writer.field(endTimeFieldName)
+        writer.value(this.endTime)
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 4872
+        buffer.writeVarInt(header0)
         event.encodeBinary(buffer)
-        buffer.writeFieldId(2)
         buffer.writeString(type)
-        buffer.writeFieldId(3)
         buffer.writeVarLong(startTime)
-        buffer.writeFieldId(4)
         buffer.writeVarLong(endTime)
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(Event::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val eventFieldName = "event".toByteArray()
-        val eventFieldHash = "event".hashCode()
-        val typeFieldName = "type".toByteArray()
-        val typeFieldHash = "type".hashCode()
-        val startTimeFieldName = "startTime".toByteArray()
-        val startTimeFieldHash = "startTime".hashCode()
-        val endTimeFieldName = "endTime".toByteArray()
-        val endTimeFieldHash = "endTime".hashCode()
+        val reader = Reader(Event::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): Event {
             var event: EventType? = null
             var type: String? = null
             var startTime: Long = 0L
             var endTime: Long = 0L
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         event = EventType.fromBinary(buffer)
+                        true
+                    }
+                    1 -> {
+                        type = buffer.readString()
+                        true
                     }
                     2 -> {
-                        type = buffer.readString()
+                        startTime = buffer.readVarLong()
+                        true
                     }
                     3 -> {
-                        startTime = buffer.readVarLong()
-                    }
-                    4 -> {
                         endTime = buffer.readVarLong()
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(event == null || type == null) {
                 throw InvalidStateException("Event instance is missing required fields")
             }
-            return Event(event, type, startTime, endTime)
+            return Event(event!!, type!!, startTime, endTime)
         }
 
-        fun fromJson(buffer: ByteBuf): Event {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): Event {
             var event: EventType? = null
             var type: String? = null
             var startTime: Long = 0L
@@ -96,7 +85,7 @@ data class Event(
                 } else if(token.type == JsonToken.Type.FieldName) {
                     when(token.stringPayload.hashCode()) {
                         eventFieldHash -> {
-                            event = EventType.fromJson(buffer)
+                            event = EventType.fromJson(token)
                         }
                         typeFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
@@ -110,6 +99,7 @@ data class Event(
                             token.expect(JsonToken.Type.NumberLit)
                             endTime = token.numberPayload.toLong()
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

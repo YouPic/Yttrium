@@ -5,61 +5,57 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
-data class ErrorPacket(
+data class ErrorResponse(
     val errors: List<Error>
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(errorsFieldName)
-        encoder.startArray()
-        for(o in errors) {
-            encoder.arrayField()
-            o.encodeJson(buffer)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(errorsFieldName)
+        writer.startArray()
+        for(o in this.errors) {
+            writer.arrayField()
+            o.encodeJson(writer)
         }
-        encoder.endArray()
-        encoder.endObject()
+        writer.endArray()
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
-        buffer.writeVarInt(errors.size)
+        val header0 = 56
+        buffer.writeVarInt(header0)
+        buffer.writeVarLong((errors.size.toLong() shl 3) or 5)
         for(o in errors) {
             o.encodeBinary(buffer)
         }
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(ErrorPacket::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
+        val reader = Reader(ErrorResponse::class.java, {fromJson(it)}, {fromBinary(it)})
 
-        val errorsFieldName = "errors".toByteArray()
-        val errorsFieldHash = "errors".hashCode()
-
-        fun fromBinary(buffer: ByteBuf): ErrorPacket {
+        fun fromBinary(buffer: ByteBuf): ErrorResponse {
             var errors: ArrayList<Error> = ArrayList()
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
-                        val length_errors = buffer.readVarInt()
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
+                        val length_errors = buffer.readVarLong() ushr 3
                         var i_errors = 0
                         while(i_errors < length_errors) {
                             errors.add(Error.fromBinary(buffer))
                             i_errors++
                         }
+                        true
                     }
+                    else -> false
                 }
             }
-            return ErrorPacket(errors)
+
+            return ErrorResponse(errors)
         }
 
-        fun fromJson(buffer: ByteBuf): ErrorPacket {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): ErrorResponse {
             var errors: ArrayList<Error> = ArrayList()
             token.expect(JsonToken.Type.StartObject)
             
@@ -72,16 +68,17 @@ data class ErrorPacket(
                         errorsFieldHash -> {
                             token.expect(JsonToken.Type.StartArray)
                             while(!token.peekArrayEnd()) {
-                                errors.add(Error.fromJson(buffer))
+                                errors.add(Error.fromJson(token))
                             }
                             token.expect(JsonToken.Type.EndArray)
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            return ErrorPacket(errors)
+            return ErrorResponse(errors)
         }
     }
 }

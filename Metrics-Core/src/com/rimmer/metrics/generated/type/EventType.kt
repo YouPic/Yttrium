@@ -13,14 +13,13 @@ enum class EventType: Writable {
         buffer.writeByte(ordinal)
     }
 
-    override fun encodeJson(buffer: ByteBuf) {
-        JsonWriter(buffer).value(name)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.value(name)
     }
 
+
     companion object {
-        init {
-            registerReadable(EventType::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
+        val reader = Reader(EventType::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): EventType {
             val index = buffer.readByte()
@@ -29,8 +28,7 @@ enum class EventType: Writable {
             return values[index.toInt()]
         }
 
-        fun fromJson(buffer: ByteBuf): EventType {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): EventType {
             token.expect(JsonToken.Type.StringLit)
             try {
                 return valueOf(token.stringPayload)

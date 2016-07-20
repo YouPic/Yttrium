@@ -5,71 +5,61 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
 data class StatSlice(
     val time: DateTime,
     val global: StatEntry,
     val paths: Map<String, StatEntry>
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(timeFieldName)
-        encoder.value(time)
-        encoder.field(globalFieldName)
-        global.encodeJson(buffer)
-        encoder.field(pathsFieldName)
-        encoder.startObject()
-        for(kv in paths) {
-            encoder.field(kv.key)
-            kv.value.encodeJson(buffer)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(timeFieldName)
+        writer.value(this.time)
+        writer.field(globalFieldName)
+        this.global.encodeJson(writer)
+        writer.field(pathsFieldName)
+        writer.startObject()
+        for(kv in this.paths) {
+            writer.field(kv.key)
+            kv.value.encodeJson(writer)
         }
-        encoder.endObject()
-        encoder.endObject()
+        writer.endObject()
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 3400
+        buffer.writeVarInt(header0)
         buffer.writeVarLong(time.millis)
-        buffer.writeFieldId(2)
         global.encodeBinary(buffer)
-        buffer.writeFieldId(3)
-        buffer.writeVarInt(paths.size)
+        buffer.writeVarLong((paths.size.toLong() shl 6) or 4 or (5 shl 3))
         for(kv in paths) {
             buffer.writeString(kv.key)
             kv.value.encodeBinary(buffer)
         }
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(StatSlice::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val timeFieldName = "time".toByteArray()
-        val timeFieldHash = "time".hashCode()
-        val globalFieldName = "global".toByteArray()
-        val globalFieldHash = "global".hashCode()
-        val pathsFieldName = "paths".toByteArray()
-        val pathsFieldHash = "paths".hashCode()
+        val reader = Reader(StatSlice::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): StatSlice {
             var time: DateTime? = null
             var global: StatEntry? = null
             var paths: HashMap<String, StatEntry> = HashMap()
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         time = buffer.readVarLong().let {DateTime(it)}
+                        true
+                    }
+                    1 -> {
+                        global = StatEntry.fromBinary(buffer)
+                        true
                     }
                     2 -> {
-                        global = StatEntry.fromBinary(buffer)
-                    }
-                    3 -> {
-                        val length_paths = buffer.readVarInt()
+                        val length_paths = buffer.readVarLong() ushr 6
                         var i_paths = 0
                         while(i_paths < length_paths) {
                             val
@@ -79,17 +69,19 @@ data class StatSlice(
                             paths.put(paths_k, paths_v)
                             i_paths++
                         }
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(time == null || global == null) {
                 throw InvalidStateException("StatSlice instance is missing required fields")
             }
-            return StatSlice(time, global, paths)
+            return StatSlice(time!!, global!!, paths)
         }
 
-        fun fromJson(buffer: ByteBuf): StatSlice {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): StatSlice {
             var time: DateTime? = null
             var global: StatEntry? = null
             var paths: HashMap<String, StatEntry> = HashMap()
@@ -106,7 +98,7 @@ data class StatSlice(
                             time = DateTime.parse(token.stringPayload)
                         }
                         globalFieldHash -> {
-                            global = StatEntry.fromJson(buffer)
+                            global = StatEntry.fromJson(token)
                         }
                         pathsFieldHash -> {
                             token.expect(JsonToken.Type.StartObject)
@@ -117,13 +109,14 @@ data class StatSlice(
                                 } else if(token.type == JsonToken.Type.FieldName) {
                                     val paths_k = token.stringPayload
                                     val
-                                    paths_v = StatEntry.fromJson(buffer)
+                                    paths_v = StatEntry.fromJson(token)
                                     paths.put(paths_k, paths_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")
                                 }
                             }
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

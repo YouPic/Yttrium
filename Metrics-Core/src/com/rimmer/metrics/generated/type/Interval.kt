@@ -10,54 +10,47 @@ data class Interval(
     val start: Long,
     val end: Long
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(startFieldName)
-        encoder.value(start)
-        encoder.field(endFieldName)
-        encoder.value(end)
-        encoder.endObject()
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(startFieldName)
+        writer.value(this.start)
+        writer.field(endFieldName)
+        writer.value(this.end)
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 72
+        buffer.writeVarInt(header0)
         buffer.writeVarLong(start)
-        buffer.writeFieldId(2)
         buffer.writeVarLong(end)
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(Interval::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val startFieldName = "start".toByteArray()
-        val startFieldHash = "start".hashCode()
-        val endFieldName = "end".toByteArray()
-        val endFieldHash = "end".hashCode()
+        val reader = Reader(Interval::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): Interval {
             var start: Long = 0L
             var end: Long = 0L
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         start = buffer.readVarLong()
+                        true
                     }
-                    2 -> {
+                    1 -> {
                         end = buffer.readVarLong()
+                        true
                     }
+                    else -> false
                 }
             }
+
             return Interval(start, end)
         }
 
-        fun fromJson(buffer: ByteBuf): Interval {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): Interval {
             var start: Long = 0L
             var end: Long = 0L
             token.expect(JsonToken.Type.StartObject)
@@ -76,6 +69,7 @@ data class Interval(
                             token.expect(JsonToken.Type.NumberLit)
                             end = token.numberPayload.toLong()
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

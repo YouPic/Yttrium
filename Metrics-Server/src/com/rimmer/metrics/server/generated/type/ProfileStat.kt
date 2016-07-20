@@ -5,62 +5,56 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
 data class ProfileStat(
     val normal: ProfileEntry,
     val max: ProfileEntry
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(normalFieldName)
-        normal.encodeJson(buffer)
-        encoder.field(maxFieldName)
-        max.encodeJson(buffer)
-        encoder.endObject()
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(normalFieldName)
+        this.normal.encodeJson(writer)
+        writer.field(maxFieldName)
+        this.max.encodeJson(writer)
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 360
+        buffer.writeVarInt(header0)
         normal.encodeBinary(buffer)
-        buffer.writeFieldId(2)
         max.encodeBinary(buffer)
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(ProfileStat::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val normalFieldName = "normal".toByteArray()
-        val normalFieldHash = "normal".hashCode()
-        val maxFieldName = "max".toByteArray()
-        val maxFieldHash = "max".hashCode()
+        val reader = Reader(ProfileStat::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): ProfileStat {
             var normal: ProfileEntry? = null
             var max: ProfileEntry? = null
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         normal = ProfileEntry.fromBinary(buffer)
+                        true
                     }
-                    2 -> {
+                    1 -> {
                         max = ProfileEntry.fromBinary(buffer)
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(normal == null || max == null) {
                 throw InvalidStateException("ProfileStat instance is missing required fields")
             }
-            return ProfileStat(normal, max)
+            return ProfileStat(normal!!, max!!)
         }
 
-        fun fromJson(buffer: ByteBuf): ProfileStat {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): ProfileStat {
             var normal: ProfileEntry? = null
             var max: ProfileEntry? = null
             token.expect(JsonToken.Type.StartObject)
@@ -72,11 +66,12 @@ data class ProfileStat(
                 } else if(token.type == JsonToken.Type.FieldName) {
                     when(token.stringPayload.hashCode()) {
                         normalFieldHash -> {
-                            normal = ProfileEntry.fromJson(buffer)
+                            normal = ProfileEntry.fromJson(token)
                         }
                         maxFieldHash -> {
-                            max = ProfileEntry.fromJson(buffer)
+                            max = ProfileEntry.fromJson(token)
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

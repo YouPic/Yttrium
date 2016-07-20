@@ -5,62 +5,58 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
-data class StatsPacket(
+data class StatResponse(
     val slices: List<StatSlice>
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(slicesFieldName)
-        encoder.startArray()
-        for(o in slices) {
-            encoder.arrayField()
-            o.encodeJson(buffer)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(slicesFieldName)
+        writer.startArray()
+        for(o in this.slices) {
+            writer.arrayField()
+            o.encodeJson(writer)
         }
-        encoder.endArray()
-        encoder.endObject()
+        writer.endArray()
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
-        buffer.writeVarInt(slices.size)
+        val header0 = 56
+        buffer.writeVarInt(header0)
+        buffer.writeVarLong((slices.size.toLong() shl 3) or 5)
         for(o in slices) {
             o.encodeBinary(buffer)
         }
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(StatsPacket::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
+        val reader = Reader(StatResponse::class.java, {fromJson(it)}, {fromBinary(it)})
 
-        val slicesFieldName = "slices".toByteArray()
-        val slicesFieldHash = "slices".hashCode()
+        fun fromBinary(buffer: ByteBuf): StatResponse {
+            val slices: ArrayList<StatSlice> = ArrayList()
 
-        fun fromBinary(buffer: ByteBuf): StatsPacket {
-            var slices: ArrayList<StatSlice> = ArrayList()
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
-                        val length_slices = buffer.readVarInt()
+            buffer.readObject {
+                when(it) {
+                    0 -> {
+                        val length_slices = buffer.readVarLong() ushr 3
                         var i_slices = 0
                         while(i_slices < length_slices) {
                             slices.add(StatSlice.fromBinary(buffer))
                             i_slices++
                         }
+                        true
                     }
+                    else -> false
                 }
             }
-            return StatsPacket(slices)
+
+            return StatResponse(slices)
         }
 
-        fun fromJson(buffer: ByteBuf): StatsPacket {
-            val token = JsonToken(buffer)
-            var slices: ArrayList<StatSlice> = ArrayList()
+        fun fromJson(token: JsonToken): StatResponse {
+            val slices: ArrayList<StatSlice> = ArrayList()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -72,16 +68,17 @@ data class StatsPacket(
                         slicesFieldHash -> {
                             token.expect(JsonToken.Type.StartArray)
                             while(!token.peekArrayEnd()) {
-                                slices.add(StatSlice.fromJson(buffer))
+                                slices.add(StatSlice.fromJson(token))
                             }
                             token.expect(JsonToken.Type.EndArray)
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            return StatsPacket(slices)
+            return StatResponse(slices)
         }
     }
 }

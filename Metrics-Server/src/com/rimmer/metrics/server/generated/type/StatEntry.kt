@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
 data class StatEntry(
     val median: Float,
@@ -15,63 +16,39 @@ data class StatEntry(
     val min: Float,
     val count: Int
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(medianFieldName)
-        encoder.value(median)
-        encoder.field(averageFieldName)
-        encoder.value(average)
-        encoder.field(average95FieldName)
-        encoder.value(average95)
-        encoder.field(average99FieldName)
-        encoder.value(average99)
-        encoder.field(maxFieldName)
-        encoder.value(max)
-        encoder.field(minFieldName)
-        encoder.value(min)
-        encoder.field(countFieldName)
-        encoder.value(count)
-        encoder.endObject()
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(medianFieldName)
+        writer.value(this.median)
+        writer.field(averageFieldName)
+        writer.value(this.average)
+        writer.field(average95FieldName)
+        writer.value(this.average95)
+        writer.field(average99FieldName)
+        writer.value(this.average99)
+        writer.field(maxFieldName)
+        writer.value(this.max)
+        writer.field(minFieldName)
+        writer.value(this.min)
+        writer.field(countFieldName)
+        writer.value(this.count)
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 2696336
+        buffer.writeVarInt(header0)
         buffer.writeFloat(median)
-        buffer.writeFieldId(2)
         buffer.writeFloat(average)
-        buffer.writeFieldId(3)
         buffer.writeFloat(average95)
-        buffer.writeFieldId(4)
         buffer.writeFloat(average99)
-        buffer.writeFieldId(5)
         buffer.writeFloat(max)
-        buffer.writeFieldId(6)
         buffer.writeFloat(min)
-        buffer.writeFieldId(7)
         buffer.writeVarInt(count)
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(StatEntry::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val medianFieldName = "median".toByteArray()
-        val medianFieldHash = "median".hashCode()
-        val averageFieldName = "average".toByteArray()
-        val averageFieldHash = "average".hashCode()
-        val average95FieldName = "average95".toByteArray()
-        val average95FieldHash = "average95".hashCode()
-        val average99FieldName = "average99".toByteArray()
-        val average99FieldHash = "average99".hashCode()
-        val maxFieldName = "max".toByteArray()
-        val maxFieldHash = "max".hashCode()
-        val minFieldName = "min".toByteArray()
-        val minFieldHash = "min".hashCode()
-        val countFieldName = "count".toByteArray()
-        val countFieldHash = "count".hashCode()
+        val reader = Reader(StatEntry::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): StatEntry {
             var median: Float = 0f
@@ -81,38 +58,45 @@ data class StatEntry(
             var max: Float = 0f
             var min: Float = 0f
             var count: Int = 0
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         median = buffer.readFloat()
+                        true
+                    }
+                    1 -> {
+                        average = buffer.readFloat()
+                        true
                     }
                     2 -> {
-                        average = buffer.readFloat()
+                        average95 = buffer.readFloat()
+                        true
                     }
                     3 -> {
-                        average95 = buffer.readFloat()
+                        average99 = buffer.readFloat()
+                        true
                     }
                     4 -> {
-                        average99 = buffer.readFloat()
+                        max = buffer.readFloat()
+                        true
                     }
                     5 -> {
-                        max = buffer.readFloat()
+                        min = buffer.readFloat()
+                        true
                     }
                     6 -> {
-                        min = buffer.readFloat()
-                    }
-                    7 -> {
                         count = buffer.readVarInt()
+                        true
                     }
+                    else -> false
                 }
             }
+
             return StatEntry(median, average, average95, average99, max, min, count)
         }
 
-        fun fromJson(buffer: ByteBuf): StatEntry {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): StatEntry {
             var median: Float = 0f
             var average: Float = 0f
             var average95: Float = 0f
@@ -156,6 +140,7 @@ data class StatEntry(
                             token.expect(JsonToken.Type.NumberLit)
                             count = token.numberPayload.toInt()
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

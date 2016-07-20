@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
 data class Error(
     val path: String,
@@ -13,51 +14,33 @@ data class Error(
     val cause: String,
     val trace: String
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(pathFieldName)
-        encoder.value(path)
-        encoder.field(latestFieldName)
-        encoder.value(latest)
-        encoder.field(countFieldName)
-        encoder.value(count)
-        encoder.field(causeFieldName)
-        encoder.value(cause)
-        encoder.field(traceFieldName)
-        encoder.value(trace)
-        encoder.endObject()
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(pathFieldName)
+        writer.value(this.path)
+        writer.field(latestFieldName)
+        writer.value(this.latest)
+        writer.field(countFieldName)
+        writer.value(this.count)
+        writer.field(causeFieldName)
+        writer.value(this.cause)
+        writer.field(traceFieldName)
+        writer.value(this.trace)
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 148064
+        buffer.writeVarInt(header0)
         buffer.writeString(path)
-        buffer.writeFieldId(2)
         buffer.writeVarLong(latest.millis)
-        buffer.writeFieldId(3)
         buffer.writeVarInt(count)
-        buffer.writeFieldId(4)
         buffer.writeString(cause)
-        buffer.writeFieldId(5)
         buffer.writeString(trace)
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(Error::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val pathFieldName = "path".toByteArray()
-        val pathFieldHash = "path".hashCode()
-        val latestFieldName = "latest".toByteArray()
-        val latestFieldHash = "latest".hashCode()
-        val countFieldName = "count".toByteArray()
-        val countFieldHash = "count".hashCode()
-        val causeFieldName = "cause".toByteArray()
-        val causeFieldHash = "cause".hashCode()
-        val traceFieldName = "trace".toByteArray()
-        val traceFieldHash = "trace".hashCode()
+        val reader = Reader(Error::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): Error {
             var path: String? = null
@@ -65,35 +48,40 @@ data class Error(
             var count: Int = 0
             var cause: String? = null
             var trace: String? = null
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         path = buffer.readString()
+                        true
+                    }
+                    1 -> {
+                        latest = buffer.readVarLong().let {DateTime(it)}
+                        true
                     }
                     2 -> {
-                        latest = buffer.readVarLong().let {DateTime(it)}
+                        count = buffer.readVarInt()
+                        true
                     }
                     3 -> {
-                        count = buffer.readVarInt()
+                        cause = buffer.readString()
+                        true
                     }
                     4 -> {
-                        cause = buffer.readString()
-                    }
-                    5 -> {
                         trace = buffer.readString()
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(path == null || latest == null || cause == null || trace == null) {
                 throw InvalidStateException("Error instance is missing required fields")
             }
-            return Error(path, latest, count, cause, trace)
+            return Error(path!!, latest!!, count, cause!!, trace!!)
         }
 
-        fun fromJson(buffer: ByteBuf): Error {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): Error {
             var path: String? = null
             var latest: DateTime? = null
             var count: Int = 0
@@ -127,6 +115,7 @@ data class Error(
                             token.expect(JsonToken.Type.StringLit)
                             trace = token.stringPayload
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

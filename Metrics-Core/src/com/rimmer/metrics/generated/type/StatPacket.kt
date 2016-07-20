@@ -13,59 +13,41 @@ data class StatPacket(
     val totalElapsed: Long,
     val intervals: List<Interval>
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(pathFieldName)
-        encoder.value(path)
-        encoder.field(serverFieldName)
-        encoder.value(server)
-        encoder.field(timeFieldName)
-        encoder.value(time)
-        encoder.field(totalElapsedFieldName)
-        encoder.value(totalElapsed)
-        encoder.field(intervalsFieldName)
-        encoder.startArray()
-        for(o in intervals) {
-            encoder.arrayField()
-            o.encodeJson(buffer)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(pathFieldName)
+        writer.value(this.path)
+        writer.field(serverFieldName)
+        writer.value(this.server)
+        writer.field(timeFieldName)
+        writer.value(this.time)
+        writer.field(totalElapsedFieldName)
+        writer.value(this.totalElapsed)
+        writer.field(intervalsFieldName)
+        writer.startArray()
+        for(o in this.intervals) {
+            writer.arrayField()
+            o.encodeJson(writer)
         }
-        encoder.endArray()
-        encoder.endObject()
+        writer.endArray()
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 234272
+        buffer.writeVarInt(header0)
         buffer.writeString(path)
-        buffer.writeFieldId(2)
         buffer.writeString(server)
-        buffer.writeFieldId(3)
         buffer.writeVarLong(time.millis)
-        buffer.writeFieldId(4)
         buffer.writeVarLong(totalElapsed)
-        buffer.writeFieldId(5)
-        buffer.writeVarInt(intervals.size)
+        buffer.writeVarLong((intervals.size.toLong() shl 3) or 5)
         for(o in intervals) {
             o.encodeBinary(buffer)
         }
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(StatPacket::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val pathFieldName = "path".toByteArray()
-        val pathFieldHash = "path".hashCode()
-        val serverFieldName = "server".toByteArray()
-        val serverFieldHash = "server".hashCode()
-        val timeFieldName = "time".toByteArray()
-        val timeFieldHash = "time".hashCode()
-        val totalElapsedFieldName = "totalElapsed".toByteArray()
-        val totalElapsedFieldHash = "totalElapsed".hashCode()
-        val intervalsFieldName = "intervals".toByteArray()
-        val intervalsFieldHash = "intervals".hashCode()
+        val reader = Reader(StatPacket::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): StatPacket {
             var path: String? = null
@@ -73,40 +55,45 @@ data class StatPacket(
             var time: DateTime? = null
             var totalElapsed: Long = 0L
             var intervals: ArrayList<Interval> = ArrayList()
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         path = buffer.readString()
+                        true
+                    }
+                    1 -> {
+                        server = buffer.readString()
+                        true
                     }
                     2 -> {
-                        server = buffer.readString()
+                        time = buffer.readVarLong().let {DateTime(it)}
+                        true
                     }
                     3 -> {
-                        time = buffer.readVarLong().let {DateTime(it)}
+                        totalElapsed = buffer.readVarLong()
+                        true
                     }
                     4 -> {
-                        totalElapsed = buffer.readVarLong()
-                    }
-                    5 -> {
-                        val length_intervals = buffer.readVarInt()
+                        val length_intervals = buffer.readVarLong() ushr 3
                         var i_intervals = 0
                         while(i_intervals < length_intervals) {
                             intervals.add(Interval.fromBinary(buffer))
                             i_intervals++
                         }
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(path == null || server == null || time == null) {
                 throw InvalidStateException("StatPacket instance is missing required fields")
             }
-            return StatPacket(path, server, time, totalElapsed, intervals)
+            return StatPacket(path!!, server!!, time!!, totalElapsed, intervals)
         }
 
-        fun fromJson(buffer: ByteBuf): StatPacket {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): StatPacket {
             var path: String? = null
             var server: String? = null
             var time: DateTime? = null
@@ -139,10 +126,11 @@ data class StatPacket(
                         intervalsFieldHash -> {
                             token.expect(JsonToken.Type.StartArray)
                             while(!token.peekArrayEnd()) {
-                                intervals.add(Interval.fromJson(buffer))
+                                intervals.add(Interval.fromJson(token))
                             }
                             token.expect(JsonToken.Type.EndArray)
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

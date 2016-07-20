@@ -5,86 +5,78 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
 data class ProfileEntry(
     val start: Long,
     val end: Long,
-    val events: List<Event>
+    val events: List<ProfileEvent>
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(startFieldName)
-        encoder.value(start)
-        encoder.field(endFieldName)
-        encoder.value(end)
-        encoder.field(eventsFieldName)
-        encoder.startArray()
-        for(o in events) {
-            encoder.arrayField()
-            o.encodeJson(buffer)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(startFieldName)
+        writer.value(this.start)
+        writer.field(endFieldName)
+        writer.value(this.end)
+        writer.field(eventsFieldName)
+        writer.startArray()
+        for(o in this.events) {
+            writer.arrayField()
+            o.encodeJson(writer)
         }
-        encoder.endArray()
-        encoder.endObject()
+        writer.endArray()
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 3656
+        buffer.writeVarInt(header0)
         buffer.writeVarLong(start)
-        buffer.writeFieldId(2)
         buffer.writeVarLong(end)
-        buffer.writeFieldId(3)
-        buffer.writeVarInt(events.size)
+        buffer.writeVarLong((events.size.toLong() shl 3) or 5)
         for(o in events) {
             o.encodeBinary(buffer)
         }
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(ProfileEntry::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val startFieldName = "start".toByteArray()
-        val startFieldHash = "start".hashCode()
-        val endFieldName = "end".toByteArray()
-        val endFieldHash = "end".hashCode()
-        val eventsFieldName = "events".toByteArray()
-        val eventsFieldHash = "events".hashCode()
+        val reader = Reader(ProfileEntry::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): ProfileEntry {
             var start: Long = 0L
             var end: Long = 0L
-            var events: ArrayList<Event> = ArrayList()
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+            val events: ArrayList<ProfileEvent> = ArrayList()
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         start = buffer.readVarLong()
+                        true
+                    }
+                    1 -> {
+                        end = buffer.readVarLong()
+                        true
                     }
                     2 -> {
-                        end = buffer.readVarLong()
-                    }
-                    3 -> {
-                        val length_events = buffer.readVarInt()
+                        val length_events = buffer.readVarLong() ushr 3
                         var i_events = 0
                         while(i_events < length_events) {
-                            events.add(Event.fromBinary(buffer))
+                            events.add(ProfileEvent.fromBinary(buffer))
                             i_events++
                         }
+                        true
                     }
+                    else -> false
                 }
             }
+
             return ProfileEntry(start, end, events)
         }
 
-        fun fromJson(buffer: ByteBuf): ProfileEntry {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): ProfileEntry {
             var start: Long = 0L
             var end: Long = 0L
-            var events: ArrayList<Event> = ArrayList()
+            val events: ArrayList<ProfileEvent> = ArrayList()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -104,10 +96,11 @@ data class ProfileEntry(
                         eventsFieldHash -> {
                             token.expect(JsonToken.Type.StartArray)
                             while(!token.peekArrayEnd()) {
-                                events.add(Event.fromJson(buffer))
+                                events.add(ProfileEvent.fromJson(token))
                             }
                             token.expect(JsonToken.Type.EndArray)
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")

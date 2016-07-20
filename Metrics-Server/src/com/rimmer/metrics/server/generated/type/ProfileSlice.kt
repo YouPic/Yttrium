@@ -5,60 +5,52 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.metrics.generated.type.*
 
 data class ProfileSlice(
     val time: DateTime,
     val paths: Map<String, ProfileStat>
 ): Writable {
-    override fun encodeJson(buffer: ByteBuf) {
-        val encoder = JsonWriter(buffer)
-        encoder.startObject()
-        encoder.field(timeFieldName)
-        encoder.value(time)
-        encoder.field(pathsFieldName)
-        encoder.startObject()
-        for(kv in paths) {
-            encoder.field(kv.key)
-            kv.value.encodeJson(buffer)
+    override fun encodeJson(writer: JsonWriter) {
+        writer.startObject()
+        writer.field(timeFieldName)
+        writer.value(this.time)
+        writer.field(pathsFieldName)
+        writer.startObject()
+        for(kv in this.paths) {
+            writer.field(kv.key)
+            kv.value.encodeJson(writer)
         }
-        encoder.endObject()
-        encoder.endObject()
+        writer.endObject()
+        writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        buffer.writeFieldId(1)
+        val header0 = 392
+        buffer.writeVarInt(header0)
         buffer.writeVarLong(time.millis)
-        buffer.writeFieldId(2)
-        buffer.writeVarInt(paths.size)
+        buffer.writeVarLong((paths.size.toLong() shl 6) or 4 or (5 shl 3))
         for(kv in paths) {
             buffer.writeString(kv.key)
             kv.value.encodeBinary(buffer)
         }
-        buffer.endObject()
     }
 
     companion object {
-        init {
-            registerReadable(ProfileSlice::class.java, {fromJson(it)}, {fromBinary(it)})
-        }
-
-        val timeFieldName = "time".toByteArray()
-        val timeFieldHash = "time".hashCode()
-        val pathsFieldName = "paths".toByteArray()
-        val pathsFieldHash = "paths".hashCode()
+        val reader = Reader(ProfileSlice::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): ProfileSlice {
             var time: DateTime? = null
             var paths: HashMap<String, ProfileStat> = HashMap()
-            
-            loop@ while(true) {
-                when(buffer.readFieldId()) {
-                    0 -> break@loop
-                    1 -> {
+
+            buffer.readObject {
+                when(it) {
+                    0 -> {
                         time = buffer.readVarLong().let {DateTime(it)}
+                        true
                     }
-                    2 -> {
-                        val length_paths = buffer.readVarInt()
+                    1 -> {
+                        val length_paths = buffer.readVarLong() ushr 6
                         var i_paths = 0
                         while(i_paths < length_paths) {
                             val
@@ -68,17 +60,19 @@ data class ProfileSlice(
                             paths.put(paths_k, paths_v)
                             i_paths++
                         }
+                        true
                     }
+                    else -> false
                 }
             }
+
             if(time == null) {
                 throw InvalidStateException("ProfileSlice instance is missing required fields")
             }
-            return ProfileSlice(time, paths)
+            return ProfileSlice(time!!, paths)
         }
 
-        fun fromJson(buffer: ByteBuf): ProfileSlice {
-            val token = JsonToken(buffer)
+        fun fromJson(token: JsonToken): ProfileSlice {
             var time: DateTime? = null
             var paths: HashMap<String, ProfileStat> = HashMap()
             token.expect(JsonToken.Type.StartObject)
@@ -102,13 +96,14 @@ data class ProfileSlice(
                                 } else if(token.type == JsonToken.Type.FieldName) {
                                     val paths_k = token.stringPayload
                                     val
-                                    paths_v = ProfileStat.fromJson(buffer)
+                                    paths_v = ProfileStat.fromJson(token)
                                     paths.put(paths_k, paths_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")
                                 }
                             }
                         }
+                        else -> token.skipValue()
                     }
                 } else {
                     throw InvalidStateException("Invalid json: expected field or object end")
