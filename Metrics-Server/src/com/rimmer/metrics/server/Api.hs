@@ -7,6 +7,11 @@ api Server where
     post profile where profile: ProfilePacket
 
 api Client where
-    get stats/(from: Long)/(to: Long) -> StatResponse where password: String
-    get profile/(from: Long)/(to: Long) -> ProfileResponse where password: String
-    get error/(from: Long) -> ErrorResponse where password: String
+    get stats/(from: Long)/(to: Long) -> StatResponse [password = True]
+    get profile/(from: Long)/(to: Long) -> ProfileResponse [password = True]
+    get error/(from: Long) -> ErrorResponse [password = True]
+
+plugin PasswordPlugin where
+    when properties has "password"
+    parameters
+        add "password": String
