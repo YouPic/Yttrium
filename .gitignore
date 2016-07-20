@@ -11,6 +11,14 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 
+pom.properties
+inputFiles.lst
 *.iml
 *.kotlin_module
-.idea
+.idea/
+
+_builds
+_projects
+_steps
+_cache
+_temp

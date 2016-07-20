@@ -16,3 +16,4 @@ The project currently consists of the following modules:
  - MySQL-Async
    - A simple, fast, fully asynchronous MySQL driver for the JVM.
    - Provides a simple DSL for easy construction of queries from code.
+
