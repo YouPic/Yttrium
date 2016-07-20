@@ -297,7 +297,15 @@ data class RawString(val value: String): Writable {
  * This is a special wrapper around ByteBuf,
  * which represents a parameter that receives the body of a request.
  */
-data class BodyContent(val value: ByteBuf)
+data class BodyContent(val value: ByteBuf) {
+    companion object {
+        val reader = Reader(BodyContent::class.java, {
+            throw IllegalStateException("The request body cannot be parsed as a normal type.")
+        }, {
+            BodyContent(it)
+        })
+    }
+}
 
 fun writeJson(value: Any?, writer: Writer<*>?, target: ByteBuf) {
     val json = JsonWriter(target)
