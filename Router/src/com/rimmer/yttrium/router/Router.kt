@@ -11,7 +11,8 @@ class RoutePlugin(val plugin: Plugin<in Any>, val context: Any)
 
 class BuilderQuery(val name: String, val optional: Boolean, val default: Any?, val description: String)
 
-class Router {
+class Router(plugins: List<Plugin<in Any>>) {
+    val pluginMap = plugins.associateBy { it.javaClass }
     val routes = ArrayList<Route>()
     val swagger = Swagger()
     var currentCategory = swagger.addCategory("None")
