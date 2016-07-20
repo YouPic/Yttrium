@@ -5,6 +5,9 @@ import java.lang.reflect.Type
 
 /** Defines a Router plugin for using custom annotations and parameter types in routes. */
 interface Plugin<Context> {
+    /** The name under which this plugin is declared. */
+    val name: String
+
     /**
      * Modifies the route path and adds any parameters needed for this plugin.
      * This is called once at route creation time.

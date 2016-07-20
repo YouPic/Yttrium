@@ -5,6 +5,7 @@ import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.yttrium.serialize.BodyContent
 import com.rimmer.yttrium.serialize.Reader
 import com.rimmer.yttrium.serialize.Writer
+import com.rimmer.yttrium.serialize.unitReader
 import java.util.*
 
 class RoutePlugin(val plugin: Plugin<in Any>, val context: Any)
@@ -12,7 +13,7 @@ class RoutePlugin(val plugin: Plugin<in Any>, val context: Any)
 class BuilderQuery(val name: String, val optional: Boolean, val default: Any?, val description: String)
 
 class Router(plugins: List<Plugin<in Any>>) {
-    val pluginMap = plugins.associateBy { it.javaClass }
+    val pluginMap = plugins.associateBy { it.name }
     val routes = ArrayList<Route>()
     val swagger = Swagger()
     var currentCategory = swagger.addCategory("None")
@@ -31,7 +32,7 @@ class Router(plugins: List<Plugin<in Any>>) {
         funSegments: Iterable<PathSegment>,
         funQueries: Iterable<BuilderQuery>,
         plugins: List<Plugin<in Any>>,
-        readers: Array<Reader>,
+        readers: Array<Reader?>,
         writer: Writer<Any>?,
         call: RouteContext.(Array<Any?>) -> Task<*>
     ) {
@@ -40,7 +41,7 @@ class Router(plugins: List<Plugin<in Any>>) {
         val providers = Array(readers.size) { false }
 
         val modifier = object: RouteModifier {
-            override val parameterReaders: Array<Reader> get() = readers
+            override val parameterReaders: Array<Reader?> get() = readers
             override fun provideParameter(index: Int) { providers[index] = true }
 
             override fun addPath(s: List<PathSegment>): Int {
@@ -97,9 +98,9 @@ class Router(plugins: List<Plugin<in Any>>) {
             }
 
             pathBindings.add(i)
-            swaggerRoute.parameters.add(
-                Swagger.Parameter(segment.name, Swagger.ParameterType.Path, "", readers[i].target, false)
-            )
+            swaggerRoute.parameters.add(Swagger.Parameter(
+                segment.name, Swagger.ParameterType.Path, "", readers[i]?.target ?: Any::class.java, false
+            ))
         }
 
         // Create a list of query parameter -> handler parameter bindings.
@@ -111,9 +112,12 @@ class Router(plugins: List<Plugin<in Any>>) {
             val index = firstQuery + i
             if(!providers[index]) {
                 queryBindings.add(index)
-                queries.add(RouteQuery(q.name, q.name.hashCode(), readers[index], q.optional, q.default, q.description))
+                queries.add(RouteQuery(
+                    q.name, q.name.hashCode(), readers[index] ?: unitReader, q.optional, q.default, q.description
+                ))
                 swaggerRoute.parameters.add(Swagger.Parameter(
-                    q.name, Swagger.ParameterType.Query, q.description, readers[index].target, q.default !== null
+                    q.name, Swagger.ParameterType.Query, q.description,
+                    readers[index]?.target ?: Any::class.java, q.default !== null
                 ))
             }
         }

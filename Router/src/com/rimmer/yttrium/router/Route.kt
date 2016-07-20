@@ -35,7 +35,7 @@ class Route(
 /** Interface that can be used by plugins to modify the signature of a route. */
 interface RouteModifier {
     /** The parameter types that need to be provided to the route handler. */
-    val parameterReaders: Array<Reader>
+    val parameterReaders: Array<Reader?>
 
     /**
      * Indicates that this plugin will provide this parameter to the route handler.
@@ -64,7 +64,7 @@ interface RouteModifier {
 
     /** Returns the index of the first argument of the provided type, or null. */
     fun hasParameter(type: Class<*>): Int? {
-        val i = parameterReaders.indexOfFirst { it.target === type }
+        val i = parameterReaders.indexOfFirst { it?.target === type }
         return if(i == -1) null else i
     }
 

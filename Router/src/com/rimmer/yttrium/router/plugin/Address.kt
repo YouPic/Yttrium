@@ -13,6 +13,8 @@ class IPAddress(val ip: String)
 
 /** Plugin for sending the caller ip-address to routes. */
 class AddressPlugin: Plugin<Int> {
+    override val name = "AddressPlugin"
+
     override fun modifyRoute(modifier: RouteModifier, properties: List<RouteProperty>): Int {
         return modifier.provide(IPAddress::class.java)
     }
