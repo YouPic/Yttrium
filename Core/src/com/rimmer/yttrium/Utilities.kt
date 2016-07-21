@@ -68,3 +68,14 @@ val ByteBuf.string: String get() = toString(Charsets.UTF_8)
 
 /** Converts a string to a bytebuf. */
 val String.byteBuf: ByteBuf get() = Unpooled.wrappedBuffer(toByteArray(Charsets.UTF_8))
+
+/** Retrieves a value from this map, or adds a new one if it doesn't exist. */
+inline fun <K, V> MutableMap<K, V>.getOrAdd(key: K, create: () -> V): V {
+    val existing = this[key]
+    val value = if(existing == null) {
+        val it = create()
+        this[key] = it
+        it
+    } else existing
+    return value
+}
