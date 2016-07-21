@@ -7,8 +7,6 @@ import com.rimmer.metrics.server.generated.type.*
 import org.joda.time.DateTime
 import java.util.*
 
-val Interval.length: Long get() = end - start
-
 class ErrorInstance(val time: DateTime, val trace: String, val cause: String, val parameters: Map<String, String>)
 
 class ErrorClass(val cause: String, val trace: String) {
@@ -27,11 +25,6 @@ class PathMetric {
     var median99 = 0L
     var min = 0L
     var max = 0L
-
-    // Sorted by interval length.
-    // Used to incrementally build data points for this minute until it is closed.
-    // This is cleared when more than a minute has elapsed.
-    var statsBuilder: List<Interval> = emptyList()
 }
 
 class Metric(time: DateTime): TimeSlice(time) {
@@ -43,12 +36,7 @@ class Metric(time: DateTime): TimeSlice(time) {
     var min = 0L
     var max = 0L
 
-    val paths = HashMap<String, PathMetric>()
-
-    // Sorted by interval length.
-    // Used to incrementally build data points for this minute until it is closed.
-    // This is cleared when more than a minute has elapsed.
-    var statsBuilder: List<Interval> = emptyList()
+    val paths = HashMap<String?, PathMetric>()
 }
 
 class ProfilePoint(val server: String, val startTime: Long, val endTime: Long, val events: List<Event>)
@@ -159,17 +147,14 @@ class MetricStore {
     }
 
     @Synchronized fun onStat(packet: StatPacket) {
-        println("Received stat packet with ${packet.intervals.size} intervals.")
-
-        // Remove the stats builder from any old in-flight points.
-        removeOldPoints(packet.time, inFlightTimes)
+        println("Received stat packet with ${packet.sampleCount} samples.")
 
         val key = packet.time.millis / 60000
         val existing = timeMap[key]
         val point = if(existing === null) {
-            // Remove older points until we have at most one day of metrics left.
-            if(inFlightTimes.size > 24*60) {
-                inFlightTimes.subList(0, inFlightTimes.size - 24*60).clear()
+            // Remove older points until we have at most one week of metrics left.
+            if(inFlightTimes.size > 7*24*60) {
+                inFlightTimes.subList(0, inFlightTimes.size - 7*24*60).clear()
             }
 
             val p = Metric(DateTime(key * 60000))
@@ -178,10 +163,10 @@ class MetricStore {
             p
         } else existing
 
-        val existingPath = point.paths[packet.path]
+        val existingPath = point.paths[packet.location]
         val path = if(existingPath === null) {
             val p = PathMetric()
-            point.paths[packet.path] = p
+            point.paths[packet.location] = p
             p
         } else existingPath
 
@@ -286,22 +271,6 @@ fun mergeIntervals(first: List<Interval>, second: List<Interval>): List<Interval
 }
 
 fun isOldPoint(time: DateTime, p: TimeSlice) = time.millis - p.time.millis > 60000
-
-fun removeOldPoints(time: DateTime, points: MutableList<Metric>) {
-    if(points.size < 2) return
-
-    var i = points.size - 1
-    while(i > 0 && !isOldPoint(time, points[i])) {
-        i--
-    }
-    val list = points.subList(0, i)
-    list.forEach {
-        it.statsBuilder = emptyList()
-        it.paths.forEach { p, path ->
-            path.statsBuilder = emptyList()
-        }
-    }
-}
 
 fun removeOldProfiles(time: DateTime, profiles: MutableList<Profile>) {
     if(profiles.size < 2) return

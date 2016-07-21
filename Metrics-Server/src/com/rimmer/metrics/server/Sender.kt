@@ -4,9 +4,7 @@ import com.rimmer.metrics.Sender
 import com.rimmer.metrics.generated.type.ErrorPacket
 import com.rimmer.metrics.generated.type.ProfilePacket
 import com.rimmer.metrics.generated.type.StatPacket
-import com.rimmer.metrics.server.generated.client.error
-import com.rimmer.metrics.server.generated.client.profile
-import com.rimmer.metrics.server.generated.client.statistic
+import com.rimmer.metrics.server.generated.client.*
 import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.yttrium.server.binary.connectBinary
@@ -25,17 +23,17 @@ class ServerSender(val context: ServerContext, val host: String, val port: Int =
 
     override fun sendStatistic(stat: StatPacket) {
         ensureClient()
-        client?.statistic(stat) { r, e -> }
+        client?.serverStatistic(stat) { r, e -> }
     }
 
     override fun sendProfile(profile: ProfilePacket) {
         ensureClient()
-        client?.profile(profile) { r, e -> }
+        client?.serverProfile(profile) { r, e -> }
     }
 
     override fun sendError(error: ErrorPacket) {
         ensureClient()
-        client?.error(error) { r, e -> }
+        client?.serverError(error) { r, e -> }
     }
 
     private fun ensureClient() {
