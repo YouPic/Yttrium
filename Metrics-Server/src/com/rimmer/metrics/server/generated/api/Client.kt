@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.router.plugin.IPAddress
 import com.rimmer.metrics.generated.type.*
 
 import com.rimmer.yttrium.router.*
@@ -12,9 +13,9 @@ import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.metrics.server.generated.type.*
 
 inline fun Router.clientApi(
-    crossinline getStats: RouteContext.(from: Long, to: Long) -> Task<StatResponse>,
-    crossinline getProfile: RouteContext.(from: Long, to: Long) -> Task<ProfileResponse>,
-    crossinline getError: RouteContext.(from: Long) -> Task<ErrorResponse>
+    crossinline getStats: RouteContext.(from: Long, to: Long) -> Task<List<TimeMetric>>,
+    crossinline getProfile: RouteContext.(from: Long, to: Long) -> Task<List<TimeProfile>>,
+    crossinline getError: RouteContext.(from: Long) -> Task<List<ErrorClass>>
 ) {
     addRoute(
         HttpMethod.GET, 0, 
@@ -23,7 +24,7 @@ inline fun Router.clientApi(
         emptyList<BuilderQuery>(), 
         listOf(pluginMap["PasswordPlugin"]!!), 
         arrayOf(longReader, longReader), 
-        null, 
+        arrayWriter<TimeMetric>(null), 
         { getStats(it[0] as Long, it[1] as Long) }
     )
     addRoute(
@@ -33,7 +34,7 @@ inline fun Router.clientApi(
         emptyList<BuilderQuery>(), 
         listOf(pluginMap["PasswordPlugin"]!!), 
         arrayOf(longReader, longReader), 
-        null, 
+        arrayWriter<TimeProfile>(null), 
         { getProfile(it[0] as Long, it[1] as Long) }
     )
     addRoute(
@@ -43,7 +44,7 @@ inline fun Router.clientApi(
         emptyList<BuilderQuery>(), 
         listOf(pluginMap["PasswordPlugin"]!!), 
         arrayOf(longReader), 
-        null, 
+        arrayWriter<ErrorClass>(null), 
         { getError(it[0] as Long) }
     )
 }

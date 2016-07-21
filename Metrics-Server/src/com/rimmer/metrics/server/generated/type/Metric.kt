@@ -5,9 +5,10 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.router.plugin.IPAddress
 import com.rimmer.metrics.generated.type.*
 
-data class StatEntry(
+data class Metric(
     val median: Float,
     val average: Float,
     val average95: Float,
@@ -48,9 +49,9 @@ data class StatEntry(
     }
 
     companion object {
-        val reader = Reader(StatEntry::class.java, {fromJson(it)}, {fromBinary(it)})
+        val reader = Reader(Metric::class.java, {fromJson(it)}, {fromBinary(it)})
 
-        fun fromBinary(buffer: ByteBuf): StatEntry {
+        fun fromBinary(buffer: ByteBuf): Metric {
             var median: Float = 0f
             var average: Float = 0f
             var average95: Float = 0f
@@ -93,10 +94,10 @@ data class StatEntry(
                 }
             }
 
-            return StatEntry(median, average, average95, average99, max, min, count)
+            return Metric(median, average, average95, average99, max, min, count)
         }
 
-        fun fromJson(token: JsonToken): StatEntry {
+        fun fromJson(token: JsonToken): Metric {
             var median: Float = 0f
             var average: Float = 0f
             var average95: Float = 0f
@@ -146,7 +147,7 @@ data class StatEntry(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            return StatEntry(median, average, average95, average99, max, min, count)
+            return Metric(median, average, average95, average99, max, min, count)
         }
     }
 }

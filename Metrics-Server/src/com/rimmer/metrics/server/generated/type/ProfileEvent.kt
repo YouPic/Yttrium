@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.router.plugin.IPAddress
 import com.rimmer.metrics.generated.type.*
 
 data class ProfileEvent(

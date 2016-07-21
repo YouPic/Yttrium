@@ -5,19 +5,23 @@ import io.netty.buffer.ByteBuf
 import java.util.*
 import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.router.plugin.IPAddress
 import com.rimmer.metrics.generated.type.*
 
-data class ProfileSlice(
+data class TimeMetric(
     val time: DateTime,
-    val paths: Map<String, ProfileStat>
+    val metric: Metric,
+    val servers: Map<String, ServerMetric>
 ): Writable {
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(timeFieldName)
         writer.value(time)
-        writer.field(pathsFieldName)
+        writer.field(metricFieldName)
+        metric.encodeJson(writer)
+        writer.field(serversFieldName)
         writer.startObject()
-        for(kv in paths) {
+        for(kv in servers) {
             writer.field(kv.key)
             kv.value.encodeJson(writer)
         }
@@ -26,22 +30,24 @@ data class ProfileSlice(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 392
+        val header0 = 3400
         buffer.writeVarInt(header0)
         buffer.writeVarLong(time.millis)
-        buffer.writeVarLong((paths.size.toLong() shl 6) or 4 or (5 shl 3))
-        for(kv in paths) {
+        metric.encodeBinary(buffer)
+        buffer.writeVarLong((servers.size.toLong() shl 6) or 4 or (5 shl 3))
+        for(kv in servers) {
             buffer.writeString(kv.key)
             kv.value.encodeBinary(buffer)
         }
     }
 
     companion object {
-        val reader = Reader(ProfileSlice::class.java, {fromJson(it)}, {fromBinary(it)})
+        val reader = Reader(TimeMetric::class.java, {fromJson(it)}, {fromBinary(it)})
 
-        fun fromBinary(buffer: ByteBuf): ProfileSlice {
+        fun fromBinary(buffer: ByteBuf): TimeMetric {
             var time: DateTime? = null
-            var paths: HashMap<String, ProfileStat> = HashMap()
+            var metric: Metric? = null
+            var servers: HashMap<String, ServerMetric> = HashMap()
 
             buffer.readObject {
                 when(it) {
@@ -50,15 +56,19 @@ data class ProfileSlice(
                         true
                     }
                     1 -> {
-                        val length_paths = buffer.readVarLong() ushr 6
-                        var i_paths = 0
-                        while(i_paths < length_paths) {
+                        metric = Metric.fromBinary(buffer)
+                        true
+                    }
+                    2 -> {
+                        val length_servers = buffer.readVarLong() ushr 6
+                        var i_servers = 0
+                        while(i_servers < length_servers) {
                             val
-                            paths_k = buffer.readString()
+                            servers_k = buffer.readString()
                             val
-                            paths_v = ProfileStat.fromBinary(buffer)
-                            paths.put(paths_k, paths_v)
-                            i_paths++
+                            servers_v = ServerMetric.fromBinary(buffer)
+                            servers.put(servers_k, servers_v)
+                            i_servers++
                         }
                         true
                     }
@@ -66,15 +76,16 @@ data class ProfileSlice(
                 }
             }
 
-            if(time == null) {
-                throw InvalidStateException("ProfileSlice instance is missing required fields")
+            if(time == null || metric == null) {
+                throw InvalidStateException("TimeMetric instance is missing required fields")
             }
-            return ProfileSlice(time!!, paths)
+            return TimeMetric(time!!, metric!!, servers)
         }
 
-        fun fromJson(token: JsonToken): ProfileSlice {
+        fun fromJson(token: JsonToken): TimeMetric {
             var time: DateTime? = null
-            var paths: HashMap<String, ProfileStat> = HashMap()
+            var metric: Metric? = null
+            var servers: HashMap<String, ServerMetric> = HashMap()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -87,17 +98,20 @@ data class ProfileSlice(
                             token.expect(JsonToken.Type.StringLit)
                             time = DateTime.parse(token.stringPayload)
                         }
-                        pathsFieldHash -> {
+                        metricFieldHash -> {
+                            metric = Metric.fromJson(token)
+                        }
+                        serversFieldHash -> {
                             token.expect(JsonToken.Type.StartObject)
                             while(true) {
                                 token.parse()
                                 if(token.type == JsonToken.Type.EndObject) {
                                     break
                                 } else if(token.type == JsonToken.Type.FieldName) {
-                                    val paths_k = token.stringPayload
+                                    val servers_k = token.stringPayload
                                     val
-                                    paths_v = ProfileStat.fromJson(token)
-                                    paths.put(paths_k, paths_v)
+                                    servers_v = ServerMetric.fromJson(token)
+                                    servers.put(servers_k, servers_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")
                                 }
@@ -109,10 +123,10 @@ data class ProfileSlice(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            if(time == null) {
-                throw InvalidStateException("ProfileSlice instance is missing required fields")
+            if(time == null || metric == null) {
+                throw InvalidStateException("TimeMetric instance is missing required fields")
             }
-            return ProfileSlice(time, paths)
+            return TimeMetric(time, metric, servers)
         }
     }
 }
