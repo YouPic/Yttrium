@@ -7,8 +7,8 @@ import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
 
 data class ProfilePacket(
-    val path: String,
-    val server: String,
+    val location: String?,
+    val category: String,
     val time: DateTime,
     val start: Long,
     val end: Long,
@@ -16,10 +16,12 @@ data class ProfilePacket(
 ): Writable {
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
-        writer.field(pathFieldName)
-        writer.value(path)
-        writer.field(serverFieldName)
-        writer.value(server)
+        if(location !== null) {
+            writer.field(locationFieldName)
+            writer.value(location)
+        }
+        writer.field(categoryFieldName)
+        writer.value(category)
         writer.field(timeFieldName)
         writer.value(time)
         writer.field(startFieldName)
@@ -37,10 +39,15 @@ data class ProfilePacket(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 1872672
+        var header0 = 1872672
+        if(location == null) {
+            header0 = header0 and -8
+        }
         buffer.writeVarInt(header0)
-        buffer.writeString(path)
-        buffer.writeString(server)
+        if(location !== null) {
+            buffer.writeString(location)
+        }
+        buffer.writeString(category)
         buffer.writeVarLong(time.millis)
         buffer.writeVarLong(start)
         buffer.writeVarLong(end)
@@ -54,8 +61,8 @@ data class ProfilePacket(
         val reader = Reader(ProfilePacket::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): ProfilePacket {
-            var path: String? = null
-            var server: String? = null
+            var location: String? = null
+            var category: String? = null
             var time: DateTime? = null
             var start: Long = 0L
             var end: Long = 0L
@@ -64,11 +71,11 @@ data class ProfilePacket(
             buffer.readObject {
                 when(it) {
                     0 -> {
-                        path = buffer.readString()
+                        location = buffer.readString()
                         true
                     }
                     1 -> {
-                        server = buffer.readString()
+                        category = buffer.readString()
                         true
                     }
                     2 -> {
@@ -96,15 +103,15 @@ data class ProfilePacket(
                 }
             }
 
-            if(path == null || server == null || time == null) {
+            if(category == null || time == null) {
                 throw InvalidStateException("ProfilePacket instance is missing required fields")
             }
-            return ProfilePacket(path!!, server!!, time!!, start, end, events)
+            return ProfilePacket(location, category!!, time!!, start, end, events)
         }
 
         fun fromJson(token: JsonToken): ProfilePacket {
-            var path: String? = null
-            var server: String? = null
+            var location: String? = null
+            var category: String? = null
             var time: DateTime? = null
             var start: Long = 0L
             var end: Long = 0L
@@ -117,13 +124,13 @@ data class ProfilePacket(
                     break
                 } else if(token.type == JsonToken.Type.FieldName) {
                     when(token.stringPayload.hashCode()) {
-                        pathFieldHash -> {
+                        locationFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
-                            path = token.stringPayload
+                            location = token.stringPayload
                         }
-                        serverFieldHash -> {
+                        categoryFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
-                            server = token.stringPayload
+                            category = token.stringPayload
                         }
                         timeFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
@@ -150,10 +157,10 @@ data class ProfilePacket(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            if(path == null || server == null || time == null) {
+            if(category == null || time == null) {
                 throw InvalidStateException("ProfilePacket instance is missing required fields")
             }
-            return ProfilePacket(path, server, time, start, end, events)
+            return ProfilePacket(location, category, time, start, end, events)
         }
     }
 }

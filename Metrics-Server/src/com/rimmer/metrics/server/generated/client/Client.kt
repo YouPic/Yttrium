@@ -10,7 +10,7 @@ import com.rimmer.metrics.generated.type.*
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.metrics.server.generated.type.*
 
-fun BinaryClient.getStats(from: Long, to: Long, password: String, callback: (StatResponse?, Throwable?) -> Unit) {
+fun BinaryClient.clientGetStats(from: Long, to: Long, password: String, callback: (StatResponse?, Throwable?) -> Unit) {
     call(
         -1537045299, {
             val header0 = 2120
@@ -24,13 +24,13 @@ fun BinaryClient.getStats(from: Long, to: Long, password: String, callback: (Sta
     )
 }
 
-fun BinaryClient.getStats(from: Long, to: Long, password: String): Task<StatResponse> {
+fun BinaryClient.clientGetStats(from: Long, to: Long, password: String): Task<StatResponse> {
     val resultTask = Task<StatResponse>()
-    getStats(from, to, password, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
+    clientGetStats(from, to, password, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
     return resultTask
 }
 
-fun BinaryClient.getProfile(from: Long, to: Long, password: String, callback: (ProfileResponse?, Throwable?) -> Unit) {
+fun BinaryClient.clientGetProfile(from: Long, to: Long, password: String, callback: (ProfileResponse?, Throwable?) -> Unit) {
     call(
         198807319, {
             val header0 = 2120
@@ -44,13 +44,13 @@ fun BinaryClient.getProfile(from: Long, to: Long, password: String, callback: (P
     )
 }
 
-fun BinaryClient.getProfile(from: Long, to: Long, password: String): Task<ProfileResponse> {
+fun BinaryClient.clientGetProfile(from: Long, to: Long, password: String): Task<ProfileResponse> {
     val resultTask = Task<ProfileResponse>()
-    getProfile(from, to, password, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
+    clientGetProfile(from, to, password, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
     return resultTask
 }
 
-fun BinaryClient.getError(from: Long, password: String, callback: (ErrorResponse?, Throwable?) -> Unit) {
+fun BinaryClient.clientGetError(from: Long, password: String, callback: (ErrorResponse?, Throwable?) -> Unit) {
     call(
         -1958242560, {
             val header0 = 264
@@ -63,9 +63,9 @@ fun BinaryClient.getError(from: Long, password: String, callback: (ErrorResponse
     )
 }
 
-fun BinaryClient.getError(from: Long, password: String): Task<ErrorResponse> {
+fun BinaryClient.clientGetError(from: Long, password: String): Task<ErrorResponse> {
     val resultTask = Task<ErrorResponse>()
-    getError(from, password, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
+    clientGetError(from, password, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
     return resultTask
 }
 

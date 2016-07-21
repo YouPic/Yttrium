@@ -7,63 +7,87 @@ import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
 
 data class StatPacket(
-    val path: String,
-    val server: String,
+    val location: String?,
+    val category: String,
     val time: DateTime,
-    val totalElapsed: Long,
-    val intervals: List<Interval>
+    val sampleCount: Int,
+    val total: Long,
+    val min: Long,
+    val max: Long,
+    val median: Long,
+    val average95: Long,
+    val average99: Long
 ): Writable {
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
-        writer.field(pathFieldName)
-        writer.value(path)
-        writer.field(serverFieldName)
-        writer.value(server)
+        if(location !== null) {
+            writer.field(locationFieldName)
+            writer.value(location)
+        }
+        writer.field(categoryFieldName)
+        writer.value(category)
         writer.field(timeFieldName)
         writer.value(time)
-        writer.field(totalElapsedFieldName)
-        writer.value(totalElapsed)
-        writer.field(intervalsFieldName)
-        writer.startArray()
-        for(o in intervals) {
-            writer.arrayField()
-            o.encodeJson(writer)
-        }
-        writer.endArray()
+        writer.field(sampleCountFieldName)
+        writer.value(sampleCount)
+        writer.field(totalFieldName)
+        writer.value(total)
+        writer.field(minFieldName)
+        writer.value(min)
+        writer.field(maxFieldName)
+        writer.value(max)
+        writer.field(medianFieldName)
+        writer.value(median)
+        writer.field(average95FieldName)
+        writer.value(average95)
+        writer.field(average99FieldName)
+        writer.value(average99)
         writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 234272
-        buffer.writeVarInt(header0)
-        buffer.writeString(path)
-        buffer.writeString(server)
-        buffer.writeVarLong(time.millis)
-        buffer.writeVarLong(totalElapsed)
-        buffer.writeVarLong((intervals.size.toLong() shl 3) or 5)
-        for(o in intervals) {
-            o.encodeBinary(buffer)
+        var header0 = 1227133728
+        if(location == null) {
+            header0 = header0 and -8
         }
+        buffer.writeVarInt(header0)
+        if(location !== null) {
+            buffer.writeString(location)
+        }
+        buffer.writeString(category)
+        buffer.writeVarLong(time.millis)
+        buffer.writeVarInt(sampleCount)
+        buffer.writeVarLong(total)
+        buffer.writeVarLong(min)
+        buffer.writeVarLong(max)
+        buffer.writeVarLong(median)
+        buffer.writeVarLong(average95)
+        buffer.writeVarLong(average99)
     }
 
     companion object {
         val reader = Reader(StatPacket::class.java, {fromJson(it)}, {fromBinary(it)})
 
         fun fromBinary(buffer: ByteBuf): StatPacket {
-            var path: String? = null
-            var server: String? = null
+            var location: String? = null
+            var category: String? = null
             var time: DateTime? = null
-            var totalElapsed: Long = 0L
-            var intervals: ArrayList<Interval> = ArrayList()
+            var sampleCount: Int = 0
+            var total: Long = 0L
+            var min: Long = 0L
+            var max: Long = 0L
+            var median: Long = 0L
+            var average95: Long = 0L
+            var average99: Long = 0L
 
             buffer.readObject {
                 when(it) {
                     0 -> {
-                        path = buffer.readString()
+                        location = buffer.readString()
                         true
                     }
                     1 -> {
-                        server = buffer.readString()
+                        category = buffer.readString()
                         true
                     }
                     2 -> {
@@ -71,34 +95,54 @@ data class StatPacket(
                         true
                     }
                     3 -> {
-                        totalElapsed = buffer.readVarLong()
+                        sampleCount = buffer.readVarInt()
                         true
                     }
                     4 -> {
-                        val length_intervals = buffer.readVarLong() ushr 3
-                        var i_intervals = 0
-                        while(i_intervals < length_intervals) {
-                            intervals!!.add(Interval.fromBinary(buffer))
-                            i_intervals++
-                        }
+                        total = buffer.readVarLong()
+                        true
+                    }
+                    5 -> {
+                        min = buffer.readVarLong()
+                        true
+                    }
+                    6 -> {
+                        max = buffer.readVarLong()
+                        true
+                    }
+                    7 -> {
+                        median = buffer.readVarLong()
+                        true
+                    }
+                    8 -> {
+                        average95 = buffer.readVarLong()
+                        true
+                    }
+                    9 -> {
+                        average99 = buffer.readVarLong()
                         true
                     }
                     else -> false
                 }
             }
 
-            if(path == null || server == null || time == null) {
+            if(category == null || time == null) {
                 throw InvalidStateException("StatPacket instance is missing required fields")
             }
-            return StatPacket(path!!, server!!, time!!, totalElapsed, intervals)
+            return StatPacket(location, category!!, time!!, sampleCount, total, min, max, median, average95, average99)
         }
 
         fun fromJson(token: JsonToken): StatPacket {
-            var path: String? = null
-            var server: String? = null
+            var location: String? = null
+            var category: String? = null
             var time: DateTime? = null
-            var totalElapsed: Long = 0L
-            var intervals: ArrayList<Interval> = ArrayList()
+            var sampleCount: Int = 0
+            var total: Long = 0L
+            var min: Long = 0L
+            var max: Long = 0L
+            var median: Long = 0L
+            var average95: Long = 0L
+            var average99: Long = 0L
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -107,28 +151,45 @@ data class StatPacket(
                     break
                 } else if(token.type == JsonToken.Type.FieldName) {
                     when(token.stringPayload.hashCode()) {
-                        pathFieldHash -> {
+                        locationFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
-                            path = token.stringPayload
+                            location = token.stringPayload
                         }
-                        serverFieldHash -> {
+                        categoryFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
-                            server = token.stringPayload
+                            category = token.stringPayload
                         }
                         timeFieldHash -> {
                             token.expect(JsonToken.Type.StringLit)
                             time = DateTime.parse(token.stringPayload)
                         }
-                        totalElapsedFieldHash -> {
+                        sampleCountFieldHash -> {
                             token.expect(JsonToken.Type.NumberLit)
-                            totalElapsed = token.numberPayload.toLong()
+                            sampleCount = token.numberPayload.toInt()
                         }
-                        intervalsFieldHash -> {
-                            token.expect(JsonToken.Type.StartArray)
-                            while(!token.peekArrayEnd()) {
-                                intervals.add(Interval.fromJson(token))
-                            }
-                            token.expect(JsonToken.Type.EndArray)
+                        totalFieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            total = token.numberPayload.toLong()
+                        }
+                        minFieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            min = token.numberPayload.toLong()
+                        }
+                        maxFieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            max = token.numberPayload.toLong()
+                        }
+                        medianFieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            median = token.numberPayload.toLong()
+                        }
+                        average95FieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            average95 = token.numberPayload.toLong()
+                        }
+                        average99FieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            average99 = token.numberPayload.toLong()
                         }
                         else -> token.skipValue()
                     }
@@ -136,10 +197,10 @@ data class StatPacket(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            if(path == null || server == null || time == null) {
+            if(category == null || time == null) {
                 throw InvalidStateException("StatPacket instance is missing required fields")
             }
-            return StatPacket(path, server, time, totalElapsed, intervals)
+            return StatPacket(location, category, time, sampleCount, total, min, max, median, average95, average99)
         }
     }
 }
