@@ -2,32 +2,33 @@ package com.rimmer.metrics.server
 
 import com.rimmer.metrics.generated.type.*
 import com.rimmer.metrics.generated.type.ErrorPacket
-import com.rimmer.metrics.generated.type.Event
 import com.rimmer.metrics.server.generated.type.*
+import com.rimmer.metrics.server.generated.type.TimeMetric as TimeMetricResponse
+import com.rimmer.metrics.server.generated.type.ServerMetric as ServerMetricResponse
+import com.rimmer.metrics.server.generated.type.CategoryMetric as CategoryMetricResponse
+import com.rimmer.metrics.server.generated.type.Metric as MetricResponse
+import com.rimmer.metrics.server.generated.type.TimeProfile as TimeProfileResponse
+import com.rimmer.metrics.server.generated.type.CategoryProfile as CategoryProfileResponse
+import com.rimmer.metrics.server.generated.type.ErrorClass as ErrorClassResponse
+import com.rimmer.yttrium.getOrAdd
 import org.joda.time.DateTime
 import java.util.*
 
-class ErrorInstance(val time: DateTime, val trace: String, val cause: String, val parameters: Map<String, String>)
+fun profileEntry(it: ProfileEntry?) = ProfileEntry(it?.start ?: 0, it?.end ?: 0, it?.events?.map {
+    ProfileEvent(it.group, it.event, it.startTime, it.endTime)
+} ?: emptyList())
 
-class ErrorClass(val cause: String, val trace: String) {
+fun profileStat(it: Profile) = ProfileStat(profileEntry(it.normal), profileEntry(it.max))
+
+class ErrorClass(val cause: String, val trace: String, val fatal: Boolean) {
     var count = 0
     var lastOccurrence = DateTime.now()
-    var instances = ArrayList<ErrorInstance>()
+    var servers = HashMap<String, ArrayList<ErrorInstance>>()
 }
 
 open class TimeSlice(val time: DateTime)
 
-class PathMetric {
-    var totalTime = 0L
-    var totalCalls = 0
-    var median = 0L
-    var median95 = 0L
-    var median99 = 0L
-    var min = 0L
-    var max = 0L
-}
-
-class Metric(time: DateTime): TimeSlice(time) {
+class Metric {
     var totalTime = 0L
     var totalCalls = 0
     var median = 0L
@@ -36,58 +37,68 @@ class Metric(time: DateTime): TimeSlice(time) {
     var min = 0L
     var max = 0L
 
-    val paths = HashMap<String?, PathMetric>()
+    fun update(packet: StatPacket) {
+        // We don't have enough information to calculate the exact values,
+        // since that would require sending detailed information about every single call.
+        // Instead, we calculate the medians through an approximation.
+        median = (median * totalCalls + packet.median * packet.sampleCount) / (totalCalls + packet.sampleCount)
+        median95 = (median95 * totalCalls + packet.average95 * packet.sampleCount) / (totalCalls + packet.sampleCount)
+        median99 = (median99 * totalCalls + packet.average99 * packet.sampleCount) / (totalCalls + packet.sampleCount)
+
+        // Update the other aggregates.
+        totalCalls += packet.sampleCount
+        totalTime += packet.total
+        max = Math.max(packet.max, max)
+        min = Math.min(packet.min, min)
+    }
+
+    fun toResponse() = MetricResponse(
+        median.toFloat(), totalTime.toFloat() / totalCalls.toFloat(), median95.toFloat(),
+        median99.toFloat(), max.toFloat(), min.toFloat(), totalCalls
+    )
 }
 
-class ProfilePoint(val server: String, val startTime: Long, val endTime: Long, val events: List<Event>)
-
-class PathProfile {
-    var normal: ProfilePoint? = null
-    var max: ProfilePoint? = null
-    val profileBuilder = ArrayList<ProfilePoint>()
+class CategoryMetric(val category: String) {
+    val metric = Metric()
+    val paths = HashMap<String, Metric>()
 }
 
-class Profile(time: DateTime): TimeSlice(time) {
-    val paths = HashMap<String, PathProfile>()
+class ServerMetric(val server: String) {
+    val metric = Metric()
+    val categories = HashMap<String, CategoryMetric>()
 }
 
-fun statEntry(it: Metric) = StatEntry(
-    it.median.toFloat(),
-    it.totalTime.toFloat() / it.totalCalls.toFloat(),
-    it.median95.toFloat(),
-    it.median99.toFloat(),
-    it.max.toFloat(),
-    it.min.toFloat(),
-    it.totalCalls
-)
+class TimeMetric(time: DateTime): TimeSlice(time) {
+    val metric = Metric()
+    val servers = HashMap<String, ServerMetric>()
+}
 
-fun statEntry(it: PathMetric) = StatEntry(
-    it.median.toFloat(),
-    it.totalTime.toFloat() / it.totalCalls.toFloat(),
-    it.median95.toFloat(),
-    it.median99.toFloat(),
-    it.max.toFloat(),
-    it.min.toFloat(),
-    it.totalCalls
-)
+class Profile {
+    var normal: ProfileEntry? = null
+    var max: ProfileEntry? = null
+    val profileBuilder = ArrayList<ProfileEntry>()
+}
 
-fun profileEntry(it: ProfilePoint?) = ProfileEntry(it?.startTime ?: 0, it?.endTime ?: 0, it?.events?.map {
-    ProfileEvent(it.event.name, it.type, it.startTime, it.endTime)
-} ?: emptyList())
+class CategoryProfile(val category: String) {
+    val profile = Profile()
+    val paths = HashMap<String, Profile>()
+}
 
-fun profileStat(it: PathProfile) = ProfileStat(profileEntry(it.normal), profileEntry(it.max))
+class TimeProfile(time: DateTime): TimeSlice(time) {
+    val servers = HashMap<String, HashMap<String, CategoryProfile>>()
+}
 
 class MetricStore {
-    val inFlightTimes = ArrayList<Metric>()
-    val inFlightProfiles = ArrayList<Profile>()
+    val inFlightTimes = ArrayList<TimeMetric>()
+    val inFlightProfiles = ArrayList<TimeProfile>()
 
-    val timeMap = HashMap<Long, Metric>()
-    val profileMap = HashMap<Long, Profile>()
+    val timeMap = HashMap<Long, TimeMetric>()
+    val profileMap = HashMap<Long, TimeProfile>()
     val errorMap = HashMap<String, HashMap<String, ErrorClass>>()
 
-    @Synchronized fun getStats(from: Long, to: Long): StatResponse {
+    @Synchronized fun getStats(from: Long, to: Long): List<TimeMetricResponse> {
         if(inFlightTimes.isEmpty()) {
-            return StatResponse(emptyList())
+            return emptyList()
         }
 
         val first = if(inFlightTimes.first().time.millis >= from) {
@@ -107,14 +118,20 @@ class MetricStore {
         val list = inFlightTimes.subList(first, last)
         println("Returning stats with ${list.size} slices.")
 
-        return StatResponse(list.map {
-            StatSlice(it.time, statEntry(it), it.paths.mapValues {statEntry(it.value)})
-        })
+        return list.map {
+            TimeMetricResponse(it.time, it.metric.toResponse(), it.servers.mapValues {
+                ServerMetricResponse(it.value.metric.toResponse(), it.value.categories.mapValues {
+                    CategoryMetricResponse(it.value.metric.toResponse(), it.value.paths.mapValues {
+                        it.value.toResponse()
+                    })
+                })
+            })
+        }
     }
 
-    @Synchronized fun getProfiles(from: Long, to: Long): ProfileResponse {
+    @Synchronized fun getProfiles(from: Long, to: Long): List<TimeProfileResponse> {
         if(inFlightProfiles.isEmpty()) {
-            return ProfileResponse(emptyList())
+            return emptyList()
         }
 
         val first = if(inFlightProfiles.first().time.millis >= from) {
@@ -134,145 +151,101 @@ class MetricStore {
         val list = inFlightProfiles.subList(first, last)
         println("Returning stats with ${list.size} slices.")
 
-        return ProfileResponse(list.map {
-            ProfileSlice(it.time, it.paths.mapValues {profileStat(it.value)})
-        })
+        return list.map {
+            TimeProfileResponse(it.time, it.servers.mapValues {
+                it.value.mapValuesTo(HashMap()) {
+                    CategoryProfileResponse(
+                        profileStat(it.value.profile),
+                        it.value.paths.mapValues { profileStat(it.value) }
+                    )
+                }
+            })
+        }
     }
 
-    @Synchronized fun getErrors(from: Long): ErrorResponse {
+    @Synchronized fun getErrors(from: Long): List<ErrorClassResponse> {
         val errors = errorMap.mapValues {it.value.filterValues {it.lastOccurrence.millis > from}}
-        return ErrorResponse(errors.flatMap { it.value.map {
-            Error(it.key, it.value.lastOccurrence, it.value.count, it.value.cause, it.value.trace)
-        }})
+        return errors.flatMap { it.value.values.map {
+            ErrorClassResponse(it.cause, it.count, it.fatal, it.lastOccurrence, it.servers)
+        } }
     }
 
-    @Synchronized fun onStat(packet: StatPacket) {
+    @Synchronized fun onStat(packet: StatPacket, remote: String) {
         println("Received stat packet with ${packet.sampleCount} samples.")
 
         val key = packet.time.millis / 60000
-        val existing = timeMap[key]
-        val point = if(existing === null) {
+        val timePoint = timeMap.getOrAdd(key) {
             // Remove older points until we have at most one week of metrics left.
             if(inFlightTimes.size > 7*24*60) {
                 inFlightTimes.subList(0, inFlightTimes.size - 7*24*60).clear()
             }
 
-            val p = Metric(DateTime(key * 60000))
-            timeMap.put(key, p)
+            val p = TimeMetric(DateTime(key * 60000))
             inFlightTimes.add(p)
             p
-        } else existing
-
-        val existingPath = point.paths[packet.location]
-        val path = if(existingPath === null) {
-            val p = PathMetric()
-            point.paths[packet.location] = p
-            p
-        } else existingPath
-
-        point.totalCalls += packet.intervals.size
-        point.totalTime += packet.totalElapsed
-        path.totalCalls += packet.intervals.size
-        path.totalTime += packet.totalElapsed
-
-        val stats = mergeIntervals(point.statsBuilder, packet.intervals)
-        if(stats.isNotEmpty()) {
-            point.max = stats[stats.size - 1].length
-            point.min = stats[0].length
-            point.median = stats[stats.size / 2].length
-            point.median95 = stats[Math.ceil((stats.size - 1).toDouble() * 0.95).toInt()].length
-            point.median99 = stats[Math.ceil((stats.size - 1).toDouble() * 0.99).toInt()].length
-            point.statsBuilder = stats
         }
 
-        val pathStats = mergeIntervals(path.statsBuilder, packet.intervals)
-        if(pathStats.isNotEmpty()) {
-            path.max = pathStats[pathStats.size - 1].length
-            path.min = pathStats[0].length
-            path.median = pathStats[pathStats.size / 2].length
-            path.median95 = pathStats[Math.ceil((pathStats.size - 1).toDouble() * 0.95).toInt()].length
-            path.median99 = pathStats[Math.ceil((pathStats.size - 1).toDouble() * 0.99).toInt()].length
-            path.statsBuilder = pathStats
-        }
+        val serverPoint = timePoint.servers.getOrAdd(remote) { ServerMetric(remote) }
+        val categoryPoint = serverPoint.categories.getOrAdd(packet.category) { CategoryMetric(packet.category) }
+        val pathPoint = packet.location?.let { categoryPoint.paths.getOrAdd(it) { Metric() } }
+
+        timePoint.metric.update(packet)
+        serverPoint.metric.update(packet)
+        categoryPoint.metric.update(packet)
+        pathPoint?.update(packet)
     }
 
-    @Synchronized fun onProfile(packet: ProfilePacket) {
+    @Synchronized fun onProfile(packet: ProfilePacket, remote: String) {
         println("Received profile packet with ${packet.events.size} events.")
 
         // Remove the profile builder from any old in-flight profiles.
         removeOldProfiles(packet.time, inFlightProfiles)
 
         val key = packet.time.millis / 60000
-        val existing = profileMap[key]
-        val profile = if(existing === null) {
+        val timeProfile = profileMap.getOrAdd(key) {
             // Remove older points until we have at most one day of metrics left.
             if(inFlightProfiles.size > 24*60) {
                 inFlightProfiles.subList(0, inFlightProfiles.size - 24*60).clear()
             }
 
-            val p = Profile(DateTime(key * 60000))
-            profileMap.put(key, p)
+            val p = TimeProfile(DateTime(key * 60000))
             inFlightProfiles.add(p)
             p
-        } else existing
+        }
 
-        val existingPath = profile.paths[packet.path]
-        val path = if(existingPath === null) {
-            val p = PathProfile()
-            profile.paths[packet.path] = p
-            p
-        } else existingPath
+        val serverProfile = timeProfile.servers.getOrAdd(remote) { HashMap() }
+        val categoryProfile = serverProfile.getOrAdd(packet.category) { CategoryProfile(packet.category) }
+        val pathProfile = packet.location?.let { categoryProfile.paths.getOrAdd(it) { Profile() } }
+        val profile = pathProfile ?: categoryProfile.profile
 
         // Keep the profile list sorted by duration.
         val duration = packet.end - packet.start
         var insertIndex = 0
-        path.profileBuilder.find {insertIndex++; (it.endTime - it.startTime) > duration}
-        path.profileBuilder.add(insertIndex - 1, ProfilePoint(packet.server, packet.start, packet.end, packet.events))
+        profile.profileBuilder.find {insertIndex++; (it.end - it.start) > duration}
+        profile.profileBuilder.add(insertIndex - 1, ProfileEntry(packet.start, packet.end, packet.events.map {
+            ProfileEvent(it.type, it.description, it.startTime, it.endTime)
+        }))
 
-        path.normal = path.profileBuilder[path.profileBuilder.size / 2]
-        path.max = path.profileBuilder[path.profileBuilder.size - 1]
+        profile.normal = profile.profileBuilder[profile.profileBuilder.size / 2]
+        profile.max = profile.profileBuilder.last()
     }
 
-    @Synchronized fun onError(packet: ErrorPacket) {
+    @Synchronized fun onError(packet: ErrorPacket, remote: String) {
         println("Received error packet.")
 
-        val classes = errorMap.getOrPut(packet.path) { HashMap<String, ErrorClass>() }
-        val type = classes.getOrPut(packet.cause) {ErrorClass(packet.cause, packet.trace)}
-        type.count++
-        type.lastOccurrence = packet.time
-        type.instances.add(ErrorInstance(packet.time, packet.trace, packet.cause, emptyMap()))
+        val category = errorMap.getOrPut(packet.category) { HashMap() }
+        val errorClass = category.getOrPut(packet.cause) { ErrorClass(packet.cause, packet.trace, packet.fatal) }
+        errorClass.count++
+        errorClass.lastOccurrence = packet.time
+        errorClass.servers.getOrAdd(remote) {
+            ArrayList()
+        }.add(ErrorInstance(packet.time, packet.trace, packet.location))
     }
-}
-
-fun mergeIntervals(first: List<Interval>, second: List<Interval>): List<Interval> {
-    val target = ArrayList<Interval>(first.size + second.size)
-    var f = 0
-    var s = 0
-    while(f < first.size && s < second.size) {
-        if(first[f].length < second[s].length) {
-            target.add(first[f])
-            f++
-        } else {
-            target.add(second[s])
-            s++
-        }
-    }
-
-    while(f < first.size) {
-        target.add(first[f])
-        f++
-    }
-
-    while(s < second.size) {
-        target.add(second[s])
-        s++
-    }
-    return target
 }
 
 fun isOldPoint(time: DateTime, p: TimeSlice) = time.millis - p.time.millis > 60000
 
-fun removeOldProfiles(time: DateTime, profiles: MutableList<Profile>) {
+fun removeOldProfiles(time: DateTime, profiles: MutableList<TimeProfile>) {
     if(profiles.size < 2) return
 
     var i = profiles.size - 1
@@ -281,9 +254,15 @@ fun removeOldProfiles(time: DateTime, profiles: MutableList<Profile>) {
     }
     val list = profiles.subList(0, i)
     list.forEach {
-        it.paths.forEach { p, path ->
-            path.profileBuilder.clear()
-            path.profileBuilder.trimToSize()
+        it.servers.forEach { s, server ->
+            server.forEach { s, category ->
+                category.profile.profileBuilder.clear()
+                category.profile.profileBuilder.trimToSize()
+                category.paths.forEach { p, path ->
+                    path.profileBuilder.clear()
+                    path.profileBuilder.trimToSize()
+                }
+            }
         }
     }
 }

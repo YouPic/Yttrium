@@ -1,6 +1,6 @@
 
 -- Statistics data types.
-data StatEntry where
+data Metric where
     median: Float
     average: Float
     average95: Float
@@ -9,13 +9,18 @@ data StatEntry where
     min: Float
     count: Int
 
-data StatSlice where
-    time: Date
-    global: StatEntry
-    paths: {String -> StatEntry}
+data CategoryMetric where
+   metric: Metric
+   paths: {String -> Metric}
 
-data StatResponse where
-    slices: {StatSlice}
+data ServerMetric where
+    metric: Metric
+    categories: {String -> CategoryMetric}
+
+data TimeMetric where
+    time: Date
+    metric: Metric
+    servers: {String -> ServerMetric}
 
 -- Profiling data types.
 data ProfileEvent where
@@ -33,19 +38,23 @@ data ProfileStat where
     normal: ProfileEntry
     max: ProfileEntry
 
-data ProfileSlice where
-    time: Date
+data CategoryProfile where
+    profile: ProfileStat
     paths: {String -> ProfileStat}
 
-data ProfileResponse where
-    slices: {ProfileSlice}
+data TimeProfile where
+    time: Date
+    servers: {String -> {String -> CategoryProfile}}
 
-data Error where
-    path: String
-    latest: Date
-    count: Int
-    cause: String
+-- Error data types.
+data ErrorInstance where
+    time: Date
     trace: String
+    path: ?String
 
-data ErrorResponse where
-    errors: {Error}
+data ErrorClass where
+    cause: String
+    count: Int
+    fatal: Bool
+    lastError: Date
+    servers: {String -> {ErrorInstance}}
