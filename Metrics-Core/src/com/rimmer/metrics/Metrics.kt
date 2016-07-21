@@ -137,12 +137,17 @@ class Metrics: MetricsWriter {
             sender?.run {
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
+                val errors = ArrayList<ErrorPacket>()
+
                 path.calls.filterTo(calls) {
                     if(it.error) {
-                        sendError(ErrorPacket(it.path, "", true, it.startDate, it.failReason, "", it.failTrace))
+                        errors.add(ErrorPacket(it.path, "", true, it.startDate, it.failReason, "", it.failTrace))
                     }
                     !it.failed
                 }
+
+                // Send any errors that occurred.
+                if(errors.isNotEmpty()) sendError(errors)
 
                 // If all calls failed, we have nothing more to do.
                 if (calls.isEmpty()) return
@@ -169,18 +174,20 @@ class Metrics: MetricsWriter {
                 val average99 = calls[Math.floor(count * 0.99).toInt()]
 
                 // Send the timing intervals for calculating statistics.
-                sendStatistic(StatPacket(
+                sendStatistic(listOf(StatPacket(
                     min.path, "", date, calls.size, totalTime,
                     min.endTime - min.startTime,
                     max.endTime - max.startTime,
                     median.endTime - median.startTime,
                     average95.endTime - average95.startTime,
                     average99.endTime - average99.startTime
-                ))
+                )))
 
                 // Send a full profile for the median and maximum values.
-                sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
-                sendProfile(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
+                sendProfile(listOf(
+                    ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events),
+                    ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events)
+                ))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
