@@ -21,19 +21,19 @@ class ServerSender(val context: ServerContext, val host: String, val port: Int =
         ensureClient()
     }
 
-    override fun sendStatistic(stat: StatPacket) {
+    override fun sendStatistic(stats: List<StatPacket>) {
         ensureClient()
-        client?.serverStatistic(stat) { r, e -> }
+        client?.serverStatistic(stats) { r, e -> }
     }
 
-    override fun sendProfile(profile: ProfilePacket) {
+    override fun sendProfile(profiles: List<ProfilePacket>) {
         ensureClient()
-        client?.serverProfile(profile) { r, e -> }
+        client?.serverProfile(profiles) { r, e -> }
     }
 
-    override fun sendError(error: ErrorPacket) {
+    override fun sendError(errors: List<ErrorPacket>) {
         ensureClient()
-        client?.serverError(error) { r, e -> }
+        client?.serverError(errors) { r, e -> }
     }
 
     private fun ensureClient() {

@@ -1,7 +1,7 @@
 package com.rimmer.metrics.client
 
-import com.rimmer.metrics.server.generated.client.getStats
-import com.rimmer.metrics.server.generated.type.StatResponse
+import com.rimmer.metrics.server.generated.client.clientGetStats
+import com.rimmer.metrics.server.generated.type.TimeMetric
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.yttrium.server.binary.connectBinary
 import com.rimmer.yttrium.server.runClient
@@ -96,7 +96,7 @@ class MetricsUI: Application() {
         val server = server
         if(server == null || !server.connected) return connect()
 
-        server.getStats(lastUpdate.millis + 1, DateTime.now().millis, password) { r, e ->
+        server.clientGetStats(lastUpdate.millis + 1, DateTime.now().millis, password) { r, e ->
             Platform.runLater {
                 if(e == null) {
                     onUpdate(r!!)
@@ -107,17 +107,17 @@ class MetricsUI: Application() {
         }
     }
 
-    fun onUpdate(packet: StatResponse) {
+    fun onUpdate(packet: List<TimeMetric>) {
         println("Received update: $packet")
 
-        packet.slices.lastOrNull()?.let {
+        packet.lastOrNull()?.let {
             lastUpdate = it.time
         }
 
-        packet.slices.forEach {
-            graph.average.data.add(XYChart.Data<Number, Number>(it.time.millis, it.global.average))
-            graph.median.data.add(XYChart.Data<Number, Number>(it.time.millis, it.global.median))
-            graph.max.data.add(XYChart.Data<Number, Number>(it.time.millis, it.global.max))
+        packet.forEach {
+            graph.average.data.add(XYChart.Data<Number, Number>(it.time.millis, it.metric.average))
+            graph.median.data.add(XYChart.Data<Number, Number>(it.time.millis, it.metric.median))
+            graph.max.data.add(XYChart.Data<Number, Number>(it.time.millis, it.metric.max))
         }
     }
 

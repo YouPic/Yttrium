@@ -8,6 +8,7 @@ import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.RouteModifier
 import com.rimmer.yttrium.router.RouteProperty
 import com.rimmer.yttrium.router.Router
+import com.rimmer.yttrium.router.plugin.AddressPlugin
 import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.yttrium.serialize.stringReader
 import com.rimmer.yttrium.server.ServerContext
@@ -18,16 +19,16 @@ import com.rimmer.yttrium.server.binary.listenBinary
 fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
     val router = Router(emptyList())
     router.serverApi(
-        statistic = {
-            store.onStat(it)
+        statistic = { it, ip ->
+            it.forEach { store.onStat(it, ip.ip) }
             finish()
         },
-        error = {
-            store.onError(it)
+        error = { it, ip ->
+            it.forEach { store.onError(it, ip.ip) }
             finish()
         },
-        profile = {
-            store.onProfile(it)
+        profile = { it, ip ->
+            it.forEach { store.onProfile(it, ip.ip) }
             finish()
         }
     )
@@ -37,7 +38,7 @@ fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
 
 /** Runs a server that listens for client requests and sends metrics data. */
 fun clientServer(context: ServerContext, store: MetricStore, port: Int, password: String) {
-    val router = Router(listOf(PasswordPlugin(password)) as List<Plugin<in Any>>)
+    val router = Router(listOf(PasswordPlugin(password), AddressPlugin()) as List<Plugin<in Any>>)
 
     router.clientApi(
         getStats = {from: Long, to: Long ->
