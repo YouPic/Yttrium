@@ -1,33 +1,35 @@
 
 data StatPacket where
-    path: String
-    server: String
+    location: ?String
+    category: String
     time: Date
-    totalElapsed: Long
-    intervals: {Interval}
+    sampleCount: Int
+    total: Long
+    min: Long
+    max: Long
+    median: Long
+    average95: Long
+    average99: Long
 
 data ErrorPacket where
-    path: String
+    location: ?String
+    category: String
+    fatal: Bool
     time: Date
     cause: String
+    description: String
     trace: String
 
 data ProfilePacket where
-    path: String
-    server: String
+    location: ?String
+    category: String
     time: Date
     start: Long
     end: Long
     events: {Event}
 
 data Event where
-    event: EventType
     "type": String
+    description: String
     startTime: Long
     endTime: Long
-
-data EventType = Redis | MySQL | MySQLGen | MySQLProcess | Mongo | Serialize
-
-data Interval where
-    start: Long
-    end: Long

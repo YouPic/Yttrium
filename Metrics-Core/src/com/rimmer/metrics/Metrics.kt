@@ -9,16 +9,16 @@ interface MetricsWriter {
      * Starts a new profiler event within the current call.
      * @return An event index to send to endQuery.
      */
-    fun startEvent(call: Int, eventType: EventType, type: String): Int
+    fun startEvent(call: Int, type: String, description: String): Int
 
     /** Indicates that the provided event id has finished. */
     fun endEvent(call: Int, id: Int)
 
     /** Adds a completed event, including the elapsed time. */
-    fun onEvent(call: Int, eventType: EventType, type: String, elapsedNanos: Long)
+    fun onEvent(call: Int, type: String, description: String, elapsedNanos: Long)
 }
 
-class Metrics(val serverName: String = "0"): MetricsWriter {
+class Metrics: MetricsWriter {
     inner class Call(val path: String, val startDate: DateTime, val startTime: Long, val parameters: Map<String, String>) {
         val events = ArrayList<Event>()
         var endTime = startTime
@@ -109,10 +109,10 @@ class Metrics(val serverName: String = "0"): MetricsWriter {
         }
     }
 
-    override fun startEvent(call: Int, eventType: EventType, type: String): Int {
+    override fun startEvent(call: Int, type: String, description: String): Int {
         val startTime = System.nanoTime()
         return getCall(call)?.run {
-            events.add(Event(eventType, type, startTime, startTime))
+            events.add(Event(type, description, startTime, startTime))
             events.size - 1
         } ?: 0
     }
@@ -124,10 +124,10 @@ class Metrics(val serverName: String = "0"): MetricsWriter {
         }
     }
 
-    override fun onEvent(call: Int, eventType: EventType, type: String, elapsedNanos: Long) {
+    override fun onEvent(call: Int, type: String, description: String, elapsedNanos: Long) {
         getCall(call)?.run {
             val endTime = System.nanoTime()
-            events.add(Event(eventType, type, endTime - elapsedNanos, endTime))
+            events.add(Event(type, description, endTime - elapsedNanos, endTime))
         }
     }
 
@@ -139,7 +139,7 @@ class Metrics(val serverName: String = "0"): MetricsWriter {
                 val calls = ArrayList<Call>(path.calls.size)
                 path.calls.filterTo(calls) {
                     if(it.error) {
-                        sendError(ErrorPacket(it.path, it.startDate, it.failReason, it.failTrace))
+                        sendError(ErrorPacket(it.path, "", true, it.startDate, it.failReason, "", it.failTrace))
                     }
                     !it.failed
                 }
@@ -159,25 +159,28 @@ class Metrics(val serverName: String = "0"): MetricsWriter {
 
                 var totalTime = 0L
                 for(c in calls) {
-                    totalTime += calls[0].endTime - calls[0].startTime
+                    totalTime += c.endTime - c.startTime
                 }
 
                 val median = calls[count / 2]
                 val min = calls[0]
                 val max = calls[count - 1]
+                val average95 = calls[Math.floor(count * 0.95).toInt()]
+                val average99 = calls[Math.floor(count * 0.99).toInt()]
 
                 // Send the timing intervals for calculating statistics.
                 sendStatistic(StatPacket(
-                    min.path,
-                    serverName,
-                    date,
-                    totalTime,
-                    calls.map { Interval(it.startTime, it.endTime) }.toCollection(ArrayList())
+                    min.path, "", date, calls.size, totalTime,
+                    min.endTime - min.startTime,
+                    max.endTime - max.startTime,
+                    median.endTime - median.startTime,
+                    average95.endTime - average95.startTime,
+                    average99.endTime - average99.startTime
                 ))
 
                 // Send a full profile for the median and maximum values.
-                sendProfile(ProfilePacket(median.path, serverName, median.startDate, median.startTime, median.endTime, median.events))
-                sendProfile(ProfilePacket(max.path, serverName, max.startDate, max.startTime, max.endTime, max.events))
+                sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
+                sendProfile(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
