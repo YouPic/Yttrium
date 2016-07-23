@@ -1,44 +1,66 @@
 package com.rimmer.metrics.server
 
-import com.rimmer.metrics.Sender
-import com.rimmer.metrics.generated.type.ErrorPacket
-import com.rimmer.metrics.generated.type.ProfilePacket
-import com.rimmer.metrics.generated.type.StatPacket
-import com.rimmer.metrics.server.generated.client.*
+import com.rimmer.metrics.generated.type.MetricPacket
+import com.rimmer.metrics.server.generated.client.serverMetric
 import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.yttrium.server.binary.connectBinary
+import io.netty.channel.EventLoop
+import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeUnit
 
 /** Minimum time between connect attempts in milliseconds. */
 val reconnectTimeout = 10000L
 
 /** Sends received metrics to a metrics server. */
-class ServerSender(val context: ServerContext, val host: String, val port: Int = 1338): Sender {
+class ServerSender(
+    val context: ServerContext,
+    val host: String,
+    val port: Int = 1338,
+    sendInterval: Int = 60 * 1000
+): (MetricPacket) -> Unit {
+    // Run the sender on a single thread to prevent internal synchronization.
+    val eventLoop: EventLoop = context.acceptorGroup.next()
+    val queue = ConcurrentLinkedQueue<MetricPacket>()
+
     var client: BinaryClient? = null
     var lastTry = 0L
 
     init {
         ensureClient()
+
+        // Periodically send queued events to the server.
+        eventLoop.scheduleAtFixedRate({
+            ensureClient()
+            client?.let {
+                sendMetrics(it)
+            }
+        }, sendInterval.toLong(), sendInterval.toLong(), TimeUnit.MILLISECONDS)
     }
 
-    override fun sendStatistic(stats: List<StatPacket>) {
-        ensureClient()
-        client?.serverStatistic(stats) { r, e -> }
+    override fun invoke(metric: MetricPacket) {
+        queue.offer(metric)
     }
 
-    override fun sendProfile(profiles: List<ProfilePacket>) {
-        ensureClient()
-        client?.serverProfile(profiles) { r, e -> }
-    }
+    private fun sendMetrics(client: BinaryClient) {
+        val metrics = ArrayList<MetricPacket>()
+        val iterator = queue.iterator()
 
-    override fun sendError(errors: List<ErrorPacket>) {
-        ensureClient()
-        client?.serverError(errors) { r, e -> }
+        iterator.forEach {
+            metrics.add(it)
+            iterator.remove()
+        }
+
+        client.serverMetric(metrics) { r, e ->
+            // If the sending failed we discard the events,
+            // as queueing too many metrics could cause spikes in server latency.
+        }
     }
 
     private fun ensureClient() {
         val client = client
-        if(client == null || !client.connected) {
+        if(client == null || !client.connected || client.responseTimer > 2*60*1000) {
             this.client = null
 
             val time = System.nanoTime()
