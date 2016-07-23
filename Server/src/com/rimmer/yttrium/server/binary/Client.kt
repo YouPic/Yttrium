@@ -47,6 +47,9 @@ interface BinaryClient {
 
     /** Set to true as long as the connection is active. */
     val connected: Boolean
+
+    /** The amount of time in milliseconds that has passed since receiving data from the server. */
+    val responseTimer: Long
 }
 
 fun connectBinary(
@@ -67,11 +70,14 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     private var context: ChannelHandlerContext? = null
     private val requests = ArrayList<Request<in Any>?>()
     private var nextRequest = 0
+    private var lastResponse = 0L
 
     override val connected: Boolean get() = context != null && context!!.channel().isActive
+    override val responseTimer: Long get() = if(context == null) 0 else System.currentTimeMillis() - lastResponse
 
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
+        lastResponse = System.currentTimeMillis()
         onConnect(this, null)
     }
 
@@ -105,6 +111,8 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     }
 
     override fun handlePacket(context: ChannelHandlerContext, request: Int, packet: ByteBuf) {
+        lastResponse = System.currentTimeMillis()
+
         if(requests.size <= request || requests[request] == null) {
             // TODO: Send this to a listener.
             println("Error in BinaryClientHandler: Unknown request id")
