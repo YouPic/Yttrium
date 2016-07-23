@@ -3,6 +3,8 @@ package com.rimmer.metrics
 import com.rimmer.metrics.generated.type.*
 import org.joda.time.DateTime
 import java.util.*
+import java.util.concurrent.atomic.AtomicLongArray
+import kotlin.concurrent.getOrSet
 
 interface MetricsWriter {
     /**
@@ -18,8 +20,14 @@ interface MetricsWriter {
     fun onEvent(call: Int, type: String, description: String, elapsedNanos: Long)
 }
 
-class Metrics: MetricsWriter {
-    inner class Call(val path: String, val startDate: DateTime, val startTime: Long, val parameters: Map<String, String>) {
+/**
+ * Handles metric events on a client.
+ * All public functions are thread-safe.
+ */
+class Metrics(maxStats: Int = 32): MetricsWriter {
+    enum class Accumulator { set, count, min, max }
+
+    class Call(val path: String, val startDate: DateTime, val startTime: Long) {
         val events = ArrayList<Event>()
         var endTime = startTime
         var failed = false
@@ -28,31 +36,83 @@ class Metrics: MetricsWriter {
         var failTrace = ""
     }
 
+    class CallData {
+        val paths = HashMap<String, Path>()
+        val calls = ArrayList<Call?>()
+        var nextCall = 0
+    }
+
     inner class Path {
         var lastSend = 0L
         var counter = 0
-        val calls = ArrayList<Call>()
+        var calls = ArrayList<Call>()
     }
 
     var sender: Sender? = null
-    private val paths = HashMap<String, Path>()
-    private val calls = ArrayList<Call?>()
-    private var nextCall = 0
+    private val callThreads = ThreadLocal<CallData>()
+
+    private val statNames = arrayOfNulls<String>(maxStats)
+    private val statTypes = ByteArray(maxStats)
+    private val statsValues = AtomicLongArray(maxStats)
+    private val statChanges = BooleanArray(maxStats)
+    private var statCount = 0
+
+    /**
+     * Registers a new statistic with the provided accumulator type.
+     * @return An id that can be used for later calls concerning this statistic.
+     */
+    @Synchronized fun registerStat(category: String, type: Accumulator): Int {
+        val currentIndex = statNames.indexOf(category)
+        if(currentIndex < 0) {
+            val index = statCount++
+            if(index >= statNames.size) throw IllegalStateException("Too many statistic types.")
+
+            statNames[index] = category
+            statTypes[index] = type.ordinal.toByte()
+            return index
+        } else if(statTypes[currentIndex] !== type.ordinal.toByte()) {
+            throw IllegalStateException("Statistic $category already exists under a different type.")
+        } else {
+            return currentIndex
+        }
+    }
+
+    /** Updates the numeric statistic for the provided id. */
+    fun setStat(id: Int, value: Long) {
+        statChanges[id] = true
+        when(statTypes[id]) {
+            Accumulator.set.ordinal.toByte() -> statsValues.set(id, value)
+            Accumulator.count.ordinal.toByte() -> statsValues.addAndGet(id, value)
+            Accumulator.min.ordinal.toByte() -> {
+                var v = value
+                while(v < statsValues.get(id)) {
+                    v = statsValues.getAndSet(id, v)
+                }
+            }
+            Accumulator.max.ordinal.toByte() -> {
+                var v = value
+                while(v > statsValues.get(id)) {
+                    v = statsValues.getAndSet(id, v)
+                }
+            }
+        }
+    }
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
-    fun start(path: String, parameters: Map<String, String>): Int {
+    fun start(path: String): Int {
         val startTime = System.nanoTime()
         val startDate = DateTime.now()
-        val call = Call(path, startDate, startTime, parameters)
+        val call = Call(path, startDate, startTime)
+        val thread = callThreads.getOrSet { CallData() }
 
-        val i = nextCall
-        if(i >= calls.size) {
-            calls.add(call)
-            nextCall++
+        val i = thread.nextCall
+        if(i >= thread.calls.size) {
+            thread.calls.add(call)
+            thread.nextCall++
         } else {
-            calls[i] = call
-            val next = calls.indexOfFirst { it == null }
-            nextCall = if(next == -1) calls.size else next
+            thread.calls[i] = call
+            val next = thread.calls.indexOfFirst { it == null }
+            thread.nextCall = if(next == -1) thread.calls.size else next
         }
         return i
     }
@@ -61,12 +121,14 @@ class Metrics: MetricsWriter {
     fun finish(callId: Int) {
         val time = System.nanoTime()
         val call = getCall(callId) ?: return
+        val thread = callThreads.get() ?: return
+
         call.endTime = time
 
-        var path = paths[call.path]
+        var path = thread.paths[call.path]
         if(path === null) {
             path = Path()
-            paths.put(call.path, path)
+            thread.paths.put(call.path, path)
         }
 
         val count = path.calls.size
@@ -137,20 +199,16 @@ class Metrics: MetricsWriter {
             sender?.run {
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
-                val errors = ArrayList<ErrorPacket>()
 
                 path.calls.filterTo(calls) {
                     if(it.error) {
-                        errors.add(ErrorPacket(it.path, "", true, it.startDate, it.failReason, "", it.failTrace))
+                        sendError(ErrorPacket(it.path, "", true, it.startDate, it.failReason, "", it.failTrace))
                     }
                     !it.failed
                 }
 
-                // Send any errors that occurred.
-                if(errors.isNotEmpty()) sendError(errors)
-
                 // If all calls failed, we have nothing more to do.
-                if (calls.isEmpty()) return
+                if(calls.isEmpty()) return
 
                 val date = calls[0].startDate
                 val count = calls.size
@@ -174,20 +232,18 @@ class Metrics: MetricsWriter {
                 val average99 = calls[Math.floor(count * 0.99).toInt()]
 
                 // Send the timing intervals for calculating statistics.
-                sendStatistic(listOf(StatPacket(
+                sendStatistic(StatPacket(
                     min.path, "", date, calls.size, totalTime,
                     min.endTime - min.startTime,
                     max.endTime - max.startTime,
                     median.endTime - median.startTime,
                     average95.endTime - average95.startTime,
                     average99.endTime - average99.startTime
-                )))
+                ))
 
                 // Send a full profile for the median and maximum values.
-                sendProfile(listOf(
-                    ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events),
-                    ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events)
-                ))
+                sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
+                sendProfile(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
@@ -196,6 +252,7 @@ class Metrics: MetricsWriter {
     }
 
     private fun getCall(id: Int): Call? {
+        val calls = callThreads.get()?.calls ?: return null
         if(calls.size <= id || calls[id] == null) {
             println("Received unknown call id $id")
             return null
@@ -205,7 +262,8 @@ class Metrics: MetricsWriter {
     }
 
     private fun removeCall(id: Int) {
-        calls[id] = null
-        nextCall = id
+        val thread = callThreads.get() ?: return
+        thread.calls[id] = null
+        thread.nextCall = id
     }
 }
