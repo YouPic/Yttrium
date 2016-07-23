@@ -4,6 +4,8 @@ import com.rimmer.metrics.generated.type.*
 import com.rimmer.yttrium.getOrAdd
 import org.joda.time.DateTime
 import java.util.*
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicLongArray
 import kotlin.concurrent.getOrSet
 
@@ -27,10 +29,11 @@ interface MetricsWriter {
  */
 class Metrics(maxStats: Int = 32): MetricsWriter {
     enum class Accumulator { set, count, min, max }
+    enum class Scope { local, global }
 
     class Call(val path: String, val startDate: DateTime, val startTime: Long) {
         val events = ArrayList<Event>()
-        var endTime = startTime
+        var endTime = 0L
         var failed = false
         var error = false
         var failReason = ""
@@ -54,15 +57,17 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
     private val statNames = arrayOfNulls<String>(maxStats)
     private val statTypes = ByteArray(maxStats)
+    private val statScopes = ByteArray(maxStats)
     private val statsValues = AtomicLongArray(maxStats)
-    private val statChanges = BooleanArray(maxStats)
     private var statCount = 0
+    @Volatile private var statsSent = 0L
+    private var statsUpdating = AtomicBoolean(false)
 
     /**
      * Registers a new statistic with the provided accumulator type.
      * @return An id that can be used for later calls concerning this statistic.
      */
-    @Synchronized fun registerStat(category: String, type: Accumulator): Int {
+    @Synchronized fun registerStat(category: String, type: Accumulator, scope: Scope): Int {
         val currentIndex = statNames.indexOf(category)
         if(currentIndex < 0) {
             val index = statCount++
@@ -70,6 +75,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
             statNames[index] = category
             statTypes[index] = type.ordinal.toByte()
+            statScopes[index] = scope.ordinal.toByte()
             return index
         } else if(statTypes[currentIndex] !== type.ordinal.toByte()) {
             throw IllegalStateException("Statistic $category already exists under a different type.")
@@ -80,7 +86,6 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
     /** Updates the numeric statistic for the provided id. */
     fun setStat(id: Int, value: Long) {
-        statChanges[id] = true
         when(statTypes[id]) {
             Accumulator.set.ordinal.toByte() -> statsValues.set(id, value)
             Accumulator.count.ordinal.toByte() -> statsValues.addAndGet(id, value)
@@ -95,6 +100,15 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 while(v > statsValues.get(id)) {
                     v = statsValues.getAndSet(id, v)
                 }
+            }
+        }
+
+        val time = System.currentTimeMillis()
+        if(time - statsSent > 60*1000 && !statsUpdating.get()) {
+            if(statsUpdating.compareAndSet(false, true)) {
+                statsSent = time
+                sendStats()
+                statsUpdating.set(false)
             }
         }
     }
@@ -150,8 +164,11 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
         }
 
         if((time - path.lastSend > 60000000000L) || (call.error && time - path.lastSend > 10000000000L)) {
-            sendStats(path)
-            path.calls.clear()
+            sendMetrics(path)
+
+            val remaining = ArrayList<Call>()
+            path.calls.filterTo(remaining) { it.endTime == 0L }
+            path.calls = remaining
             path.lastSend = time
         }
 
@@ -199,7 +216,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
         }
     }
 
-    private fun sendStats(path: Path) {
+    private fun sendMetrics(path: Path) {
         // The sender may throw exceptions, which we don't want to leak.
         try {
             sender?.let { sender ->
@@ -218,7 +235,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                             Error(it.startDate, it.path, it.failReason, it.failTrace)
                         }.count++
                     }
-                    !it.failed
+                    !it.failed && it.endTime > 0
                 }
 
                 errors.forEach { s, error ->
@@ -268,6 +285,27 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
         } catch(e: Throwable) {
             println("Could not send metrics:")
             e.printStackTrace()
+        }
+    }
+
+    private fun sendStats() {
+        // This iteration will be based on information that can be updated while iterating.
+        // That should not be a problem, however, since categories are only ever added
+        // and the values themselves will at most be sent in a different batch while still being accounted for.
+        sender?.let { sender ->
+            val time = DateTime.now()
+            for(i in 0..statCount - 1) {
+                val category = statNames[i] ?: ""
+                val scope = statScopes[i]
+
+                // Reset the stat value if it has local scope.
+                val value = if(scope == Scope.local.ordinal.toByte()) {
+                    statsValues.getAndSet(i, 0)
+                } else {
+                    statsValues[i]
+                }
+                sender(StatPacket(null, category, time, 1, value, value, value, value, value, value))
+            }
         }
     }
 
