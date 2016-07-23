@@ -19,6 +19,7 @@ data ErrorPacket where
     cause: String
     description: String
     trace: String
+    count: Int
 
 data ProfilePacket where
     location: ?String

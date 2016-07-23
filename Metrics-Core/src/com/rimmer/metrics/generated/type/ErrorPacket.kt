@@ -13,7 +13,8 @@ data class ErrorPacket(
     val time: DateTime,
     val cause: String,
     val description: String,
-    val trace: String
+    val trace: String,
+    val count: Int
 ): Writable {
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
@@ -33,11 +34,13 @@ data class ErrorPacket(
         writer.value(description)
         writer.field(traceFieldName)
         writer.value(trace)
+        writer.field(countFieldName)
+        writer.value(count)
         writer.endObject()
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        var header0 = 9573152
+        var header0 = 26350368
         if(location == null) {
             header0 = header0 and -8
         }
@@ -51,6 +54,7 @@ data class ErrorPacket(
         buffer.writeString(cause)
         buffer.writeString(description)
         buffer.writeString(trace)
+        buffer.writeVarInt(count)
     }
 
     companion object {
@@ -64,6 +68,7 @@ data class ErrorPacket(
             var cause: String? = null
             var description: String? = null
             var trace: String? = null
+            var count: Int = 0
 
             buffer.readObject {
                 when(it) {
@@ -95,6 +100,10 @@ data class ErrorPacket(
                         trace = buffer.readString()
                         true
                     }
+                    7 -> {
+                        count = buffer.readVarInt()
+                        true
+                    }
                     else -> false
                 }
             }
@@ -102,7 +111,7 @@ data class ErrorPacket(
             if(category == null || time == null || cause == null || description == null || trace == null) {
                 throw InvalidStateException("ErrorPacket instance is missing required fields")
             }
-            return ErrorPacket(location, category!!, fatal, time!!, cause!!, description!!, trace!!)
+            return ErrorPacket(location, category!!, fatal, time!!, cause!!, description!!, trace!!, count)
         }
 
         fun fromJson(token: JsonToken): ErrorPacket {
@@ -113,6 +122,7 @@ data class ErrorPacket(
             var cause: String? = null
             var description: String? = null
             var trace: String? = null
+            var count: Int = 0
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -149,6 +159,10 @@ data class ErrorPacket(
                             token.expect(JsonToken.Type.StringLit)
                             trace = token.stringPayload
                         }
+                        countFieldHash -> {
+                            token.expect(JsonToken.Type.NumberLit)
+                            count = token.numberPayload.toInt()
+                        }
                         else -> token.skipValue()
                     }
                 } else {
@@ -158,7 +172,7 @@ data class ErrorPacket(
             if(category == null || time == null || cause == null || description == null || trace == null) {
                 throw InvalidStateException("ErrorPacket instance is missing required fields")
             }
-            return ErrorPacket(location, category, fatal, time, cause, description, trace)
+            return ErrorPacket(location, category, fatal, time, cause, description, trace, count)
         }
     }
 }

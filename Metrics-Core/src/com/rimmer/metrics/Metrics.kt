@@ -1,6 +1,7 @@
 package com.rimmer.metrics
 
 import com.rimmer.metrics.generated.type.*
+import com.rimmer.yttrium.getOrAdd
 import org.joda.time.DateTime
 import java.util.*
 import java.util.concurrent.atomic.AtomicLongArray
@@ -96,6 +97,11 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 }
             }
         }
+    }
+
+    /** Logs a custom error packet. */
+    fun logError(category: String, path: String, reason: String, description: String, trace: String, fatal: Boolean) {
+        sender?.sendError(ErrorPacket(path, category, fatal, DateTime.now(), reason, description, trace, 1))
     }
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
@@ -200,11 +206,25 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
 
+                class Error(val start: DateTime, val path: String, val reason: String, val trace: String) {
+                    var count = 0
+                }
+                val errors = HashMap<String, Error>()
+
                 path.calls.filterTo(calls) {
                     if(it.error) {
-                        sendError(ErrorPacket(it.path, "", true, it.startDate, it.failReason, "", it.failTrace))
+                        // Avoid sending many errors of the same kind.
+                        errors.getOrAdd(it.failReason) {
+                            Error(it.startDate, it.path, it.failReason, it.failTrace)
+                        }.count++
                     }
                     !it.failed
+                }
+
+                errors.forEach { s, error ->
+                    sendError(ErrorPacket(
+                        error.path, "", true, error.start, error.reason, "", error.trace, error.count
+                    ))
                 }
 
                 // If all calls failed, we have nothing more to do.

@@ -9,6 +9,9 @@ val average95FieldHash = "average95".hashCode()
 val maxFieldName = "max".toByteArray()
 val maxFieldHash = "max".hashCode()
 
+val countFieldName = "count".toByteArray()
+val countFieldHash = "count".hashCode()
+
 val startFieldName = "start".toByteArray()
 val startFieldHash = "start".hashCode()
 
