@@ -1,5 +1,8 @@
 package com.rimmer.metrics.server
 
+import com.rimmer.metrics.generated.type.ErrorPacket
+import com.rimmer.metrics.generated.type.ProfilePacket
+import com.rimmer.metrics.generated.type.StatPacket
 import com.rimmer.metrics.server.generated.api.clientApi
 import com.rimmer.metrics.server.generated.api.serverApi
 import com.rimmer.yttrium.UnauthorizedException
@@ -19,16 +22,14 @@ import com.rimmer.yttrium.server.binary.listenBinary
 fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
     val router = Router(emptyList())
     router.serverApi(
-        statistic = { it, ip ->
-            it.forEach { store.onStat(it, ip.ip) }
-            finish()
-        },
-        error = { it, ip ->
-            it.forEach { store.onError(it, ip.ip) }
-            finish()
-        },
-        profile = { it, ip ->
-            it.forEach { store.onProfile(it, ip.ip) }
+        metric = { it, ip ->
+            it.forEach {
+                when(it) {
+                    is StatPacket -> store.onStat(it, ip.ip)
+                    is ProfilePacket -> store.onProfile(it, ip.ip)
+                    is ErrorPacket -> store.onError(it, ip.ip)
+                }
+            }
             finish()
         }
     )

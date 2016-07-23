@@ -49,7 +49,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
         var calls = ArrayList<Call>()
     }
 
-    var sender: Sender? = null
+    var sender: ((MetricPacket) -> Unit)? = null
     private val callThreads = ThreadLocal<CallData>()
 
     private val statNames = arrayOfNulls<String>(maxStats)
@@ -101,7 +101,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
     /** Logs a custom error packet. */
     fun logError(category: String, path: String, reason: String, description: String, trace: String, fatal: Boolean) {
-        sender?.sendError(ErrorPacket(path, category, fatal, DateTime.now(), reason, description, trace, 1))
+        sender?.invoke(ErrorPacket(path, category, fatal, DateTime.now(), reason, description, trace, 1))
     }
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
@@ -202,7 +202,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
     private fun sendStats(path: Path) {
         // The sender may throw exceptions, which we don't want to leak.
         try {
-            sender?.run {
+            sender?.let { sender ->
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
 
@@ -222,7 +222,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 }
 
                 errors.forEach { s, error ->
-                    sendError(ErrorPacket(
+                    sender(ErrorPacket(
                         error.path, "", true, error.start, error.reason, "", error.trace, error.count
                     ))
                 }
@@ -252,7 +252,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 val average99 = calls[Math.floor(count * 0.99).toInt()]
 
                 // Send the timing intervals for calculating statistics.
-                sendStatistic(StatPacket(
+                sender(StatPacket(
                     min.path, "", date, calls.size, totalTime,
                     min.endTime - min.startTime,
                     max.endTime - max.startTime,
@@ -262,8 +262,8 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 ))
 
                 // Send a full profile for the median and maximum values.
-                sendProfile(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
-                sendProfile(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
+                sender(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
+                sender(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")

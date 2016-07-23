@@ -13,38 +13,16 @@ import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.metrics.server.generated.type.*
 
 inline fun Router.serverApi(
-    crossinline statistic: RouteContext.(stats: List<StatPacket>, ip: IPAddress) -> Task<Unit>,
-    crossinline error: RouteContext.(errors: List<ErrorPacket>, ip: IPAddress) -> Task<Unit>,
-    crossinline profile: RouteContext.(profiles: List<ProfilePacket>, ip: IPAddress) -> Task<Unit>
+    crossinline metric: RouteContext.(packets: List<MetricPacket>, ip: IPAddress) -> Task<Unit>
 ) {
     addRoute(
         HttpMethod.POST, 0, 
         emptyList<RouteProperty>(), 
-        listOf(PathSegment("statistic", null)), 
-        listOf(BuilderQuery("stats", false, null, ""), BuilderQuery("ip", false, null, "")), 
+        listOf(PathSegment("metric", null)), 
+        listOf(BuilderQuery("packets", false, null, ""), BuilderQuery("ip", false, null, "")), 
         listOf(pluginMap["IPPlugin"]!!), 
-        arrayOf(arrayReader<StatPacket>(StatPacket.reader), null), 
+        arrayOf(arrayReader<MetricPacket>(MetricPacket.reader), null), 
         null, 
-        { statistic(it[0] as List<StatPacket>, it[1] as IPAddress) }
-    )
-    addRoute(
-        HttpMethod.POST, 0, 
-        emptyList<RouteProperty>(), 
-        listOf(PathSegment("error", null)), 
-        listOf(BuilderQuery("errors", false, null, ""), BuilderQuery("ip", false, null, "")), 
-        listOf(pluginMap["IPPlugin"]!!), 
-        arrayOf(arrayReader<ErrorPacket>(ErrorPacket.reader), null), 
-        null, 
-        { error(it[0] as List<ErrorPacket>, it[1] as IPAddress) }
-    )
-    addRoute(
-        HttpMethod.POST, 0, 
-        emptyList<RouteProperty>(), 
-        listOf(PathSegment("profile", null)), 
-        listOf(BuilderQuery("profiles", false, null, ""), BuilderQuery("ip", false, null, "")), 
-        listOf(pluginMap["IPPlugin"]!!), 
-        arrayOf(arrayReader<ProfilePacket>(ProfilePacket.reader), null), 
-        null, 
-        { profile(it[0] as List<ProfilePacket>, it[1] as IPAddress) }
+        { metric(it[0] as List<MetricPacket>, it[1] as IPAddress) }
     )
 }

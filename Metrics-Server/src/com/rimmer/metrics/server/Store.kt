@@ -22,7 +22,7 @@ fun profileStat(it: Profile) = ProfileStat(profileEntry(it.normal), profileEntry
 
 class ErrorClass(val cause: String, val trace: String, val fatal: Boolean) {
     var count = 0
-    var lastOccurrence = DateTime.now()
+    var lastOccurrence: DateTime = DateTime.now()
     var servers = HashMap<String, ArrayList<ErrorInstance>>()
 }
 

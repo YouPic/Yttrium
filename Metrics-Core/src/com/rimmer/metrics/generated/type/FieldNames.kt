@@ -30,11 +30,11 @@ val fatalFieldHash = "fatal".hashCode()
 val sampleCountFieldName = "sampleCount".toByteArray()
 val sampleCountFieldHash = "sampleCount".hashCode()
 
-val traceFieldName = "trace".toByteArray()
-val traceFieldHash = "trace".hashCode()
-
 val totalFieldName = "total".toByteArray()
 val totalFieldHash = "total".hashCode()
+
+val traceFieldName = "trace".toByteArray()
+val traceFieldHash = "trace".hashCode()
 
 val minFieldName = "min".toByteArray()
 val minFieldHash = "min".hashCode()

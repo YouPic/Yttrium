@@ -3,9 +3,7 @@ import com.rimmer.metrics
 import com.rimmer.yttrium.router.plugin.IPAddress
 
 api Server where
-    post statistic where stats: {StatPacket}; ip: IPAddress
-    post error where errors: {ErrorPacket}; ip: IPAddress
-    post profile where profiles: {ProfilePacket}; ip: IPAddress
+    post metric where packets: {MetricPacket}; ip: IPAddress
 
 api Client where
     get stats/(from: Long)/(to: Long) -> {TimeMetric} [password = True]
