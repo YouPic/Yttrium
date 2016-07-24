@@ -9,9 +9,9 @@ import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.RouteListener
 import io.netty.channel.EventLoop
 
-class MetricsListener(val metrics: Metrics, val next: RouteListener?): RouteListener {
+class MetricsListener(val metrics: Metrics, val category: String, val next: RouteListener?): RouteListener {
     override fun onStart(eventLoop: EventLoop, route: Route): Long {
-        val id = metrics.start(route.name).toLong()
+        val id = metrics.start(route.name, category).toLong()
         next?.onStart(eventLoop, route)
         return id
     }

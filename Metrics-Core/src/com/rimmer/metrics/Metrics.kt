@@ -31,7 +31,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
     enum class Accumulator { set, count, min, max }
     enum class Scope { local, global }
 
-    class Call(val path: String, val startDate: DateTime, val startTime: Long) {
+    class Call(val path: String, val category: String, val startDate: DateTime, val startTime: Long) {
         val events = ArrayList<Event>()
         var endTime = 0L
         var failed = false
@@ -119,10 +119,10 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
     }
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
-    fun start(path: String): Int {
+    fun start(path: String, category: String): Int {
         val startTime = System.nanoTime()
         val startDate = DateTime.now()
-        val call = Call(path, startDate, startTime)
+        val call = Call(path, category, startDate, startTime)
         val thread = callThreads.getOrSet { CallData() }
 
         val i = thread.nextCall
@@ -223,7 +223,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
 
-                class Error(val start: DateTime, val path: String, val reason: String, val trace: String) {
+                class Error(val start: DateTime, val path: String, val category: String, val reason: String, val trace: String) {
                     var count = 0
                 }
                 val errors = HashMap<String, Error>()
@@ -232,7 +232,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                     if(it.error) {
                         // Avoid sending many errors of the same kind.
                         errors.getOrAdd(it.failReason) {
-                            Error(it.startDate, it.path, it.failReason, it.failTrace)
+                            Error(it.startDate, it.path, it.category, it.failReason, it.failTrace)
                         }.count++
                     }
                     !it.failed && it.endTime > 0
@@ -240,7 +240,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
                 errors.forEach { s, error ->
                     sender(ErrorPacket(
-                        error.path, "", true, error.start, error.reason, "", error.trace, error.count
+                        error.path, error.category, true, error.start, error.reason, "", error.trace, error.count
                     ))
                 }
 
@@ -270,7 +270,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
                 // Send the timing intervals for calculating statistics.
                 sender(StatPacket(
-                    min.path, "", date, calls.size, totalTime,
+                    min.path, min.category, date, calls.size, totalTime,
                     min.endTime - min.startTime,
                     max.endTime - max.startTime,
                     median.endTime - median.startTime,
@@ -279,8 +279,8 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 ))
 
                 // Send a full profile for the median and maximum values.
-                sender(ProfilePacket(median.path, "", median.startDate, median.startTime, median.endTime, median.events))
-                sender(ProfilePacket(max.path, "", max.startDate, max.startTime, max.endTime, max.events))
+                sender(ProfilePacket(median.path, median.category, median.startDate, median.startTime, median.endTime, median.events))
+                sender(ProfilePacket(max.path, max.category, max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
