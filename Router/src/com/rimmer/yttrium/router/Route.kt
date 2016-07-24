@@ -2,6 +2,7 @@ package com.rimmer.yttrium.router
 
 import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
+import com.rimmer.yttrium.router.listener.RouteListener
 import com.rimmer.yttrium.serialize.Reader
 import com.rimmer.yttrium.serialize.Writer
 import io.netty.channel.ChannelHandlerContext
@@ -29,7 +30,7 @@ class Route(
     val queries: Array<RouteQuery>,
     val writer: Writer<*>?,
     val bodyQuery: Int?,
-    var handler: (RouteContext, RouteListener) -> Unit = {c, r ->}
+    var handler: (RouteContext, RouteListener) -> Unit = { c, r ->}
 )
 
 /** Interface that can be used by plugins to modify the signature of a route. */
@@ -98,32 +99,6 @@ class RouteQuery(
     val default: Any?,
     val description: String
 )
-
-/**
- * When sent to a route handler, this will be called with progress information about the route.
- * Can be used to collect metrics or display debug information.
- */
-interface RouteListener {
-    /**
-     * This is called whenever a route call starts.
-     * @return A listener id that will be sent to any followup calls for this route.
-     */
-    fun onStart(eventLoop: EventLoop, route: Route): Long
-
-    /**
-     * This is called whenever a route call succeeds.
-     * @param route The context for this route, including the call id returned by onStart.
-     * @param result The returned result of the route.
-     */
-    fun onSucceed(route: RouteContext, result: Any?)
-
-    /**
-     * This is called whenever a route call fails.
-     * @param route The context for this route, including the call id returned by onStart.
-     * @param reason The reason this call failed, if any.
-     */
-    fun onFail(route: RouteContext, reason: Throwable?)
-}
 
 /**
  * Context information that is sent to route handlers.

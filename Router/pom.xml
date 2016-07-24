@@ -66,6 +66,11 @@
             <artifactId>Yttrium-Core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>Metrics-Core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <artifactId>Yttrium-Router</artifactId>

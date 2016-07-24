@@ -6,8 +6,8 @@ import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
 import com.rimmer.yttrium.router.Route
 import com.rimmer.yttrium.router.RouteContext
-import com.rimmer.yttrium.router.RouteListener
 import com.rimmer.yttrium.router.Router
+import com.rimmer.yttrium.router.listener.RouteListener
 import com.rimmer.yttrium.serialize.*
 import com.rimmer.yttrium.server.http.checkQueries
 import io.netty.buffer.ByteBuf

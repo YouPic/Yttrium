@@ -1,6 +1,7 @@
 package com.rimmer.yttrium.router
 
 import com.rimmer.yttrium.Task
+import com.rimmer.yttrium.router.listener.RouteListener
 
 fun routeHandler(
     route: Route,
