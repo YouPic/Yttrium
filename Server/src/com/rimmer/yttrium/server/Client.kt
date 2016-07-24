@@ -47,8 +47,8 @@ fun runClient(threadCount: Int = 0, useNative: Boolean = false): ServerContext {
     // Create the server thread pools to use for every module.
     // Use native Epoll if possible, since it gives much better performance for small packets.
     val handlerThreads = if(threadCount == 0) Runtime.getRuntime().availableProcessors() else threadCount
-    var acceptorGroup: EventLoopGroup
-    var handlerGroup: EventLoopGroup
+    val acceptorGroup: EventLoopGroup
+    val handlerGroup: EventLoopGroup
 
     if(Epoll.isAvailable() && useNative) {
         acceptorGroup = EpollEventLoopGroup(1)

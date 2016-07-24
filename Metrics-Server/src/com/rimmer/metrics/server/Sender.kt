@@ -15,7 +15,7 @@ val reconnectTimeout = 10000L
 
 /** Sends received metrics to a metrics server. */
 class ServerSender(
-    val context: ServerContext,
+    context: ServerContext,
     val host: String,
     val port: Int = 1338,
     sendInterval: Int = 60 * 1000
@@ -61,13 +61,14 @@ class ServerSender(
     private fun ensureClient() {
         val client = client
         if(client == null || !client.connected || client.responseTimer > 2*60*1000) {
+            client?.close()
             this.client = null
 
-            val time = System.nanoTime()
-            if(time - lastTry < reconnectTimeout * 1000000) return
+            val time = System.currentTimeMillis()
+            if(time - lastTry < reconnectTimeout) return
             lastTry = time
 
-            connectBinary(context.handlerGroup, host, port) { c, e ->
+            connectBinary(eventLoop, host, port) { c, e ->
                 if(e == null) {
                     println("Connected to metrics server.")
                 } else {
