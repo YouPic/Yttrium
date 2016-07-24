@@ -15,6 +15,7 @@
         <module>Metrics-Server</module>
         <module>Metrics-UI</module>
         <module>Metrics-Yttrium</module>
+        <module>MySQL</module>
     </modules>
 
     <build>
