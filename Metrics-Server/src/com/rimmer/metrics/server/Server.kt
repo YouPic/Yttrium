@@ -20,7 +20,7 @@ import com.rimmer.yttrium.server.binary.listenBinary
 
 /** Runs a server that receives metrics and stores them in-memory. */
 fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
-    val router = Router(emptyList())
+    val router = Router(listOf(AddressPlugin()) as List<Plugin<in Any>>)
     router.serverApi(
         metric = { it, ip ->
             it.forEach {
@@ -64,7 +64,7 @@ class PasswordPlugin(val password: String): Plugin<Int> {
     }
 
     override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {
-        if((arguments[context] as String) != password) f(UnauthorizedException())
+        if((route.queryParameters[context] as String) != password) f(UnauthorizedException())
         else f(null)
     }
 }

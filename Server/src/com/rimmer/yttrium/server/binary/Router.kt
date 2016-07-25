@@ -51,7 +51,7 @@ class BinaryRouter(
             source.readObject {
                 if(it > paramCount + queries.size) {
                     false
-                } else if(it > paramCount) {
+                } else if(it >= paramCount) {
                     val i = it - paramCount
                     queries[i] = route.queries[i].reader!!.fromBinary(source)
                     true

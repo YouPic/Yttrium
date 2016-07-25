@@ -15,7 +15,7 @@ plugin PasswordPlugin where
     parameters
         add "password": String
 
-plugin IPPlugin where
+plugin AddressPlugin where
     when args has IPAddress
     parameters
         handle IPAddress

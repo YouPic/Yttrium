@@ -75,13 +75,3 @@ inline fun writePacket(context: ChannelHandlerContext, request: Int, writer: (By
         context.writeAndFlush(target, context.voidPromise())
     }
 }
-
-fun writeNullMap(values: Array<Any?>, target: ByteBuf) {
-    var map = 0L
-    values.forEachIndexed { i, v ->
-        if(v != null) {
-            map = map or (1L shl i)
-        }
-    }
-    target.writeVarLong(map)
-}
