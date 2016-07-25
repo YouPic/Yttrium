@@ -97,7 +97,7 @@ data class StatPacket(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        var header0 = 1227135240
+        var header0 = 1227133729
         if(location == null) {
             header0 = header0 and -57
         }
@@ -114,7 +114,7 @@ data class StatPacket(
         buffer.writeVarLong(max)
         buffer.writeVarLong(median)
         buffer.writeVarLong(average95)
-        var header10 = 8
+        var header10 = 1
         buffer.writeVarInt(header10)
         buffer.writeVarLong(average99)
     }
@@ -296,7 +296,7 @@ data class ProfilePacket(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        var header0 = 14981384
+        var header0 = 1872673
         if(location == null) {
             header0 = header0 and -57
         }
@@ -461,7 +461,7 @@ data class ErrorPacket(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        var header0 = 210802952
+        var header0 = 26350369
         if(location == null) {
             header0 = header0 and -57
         }

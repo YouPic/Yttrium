@@ -37,7 +37,7 @@ data class Metric(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 2696336
+        val header0 = 337042
         buffer.writeVarInt(header0)
         buffer.writeFloat(median)
         buffer.writeFloat(average)

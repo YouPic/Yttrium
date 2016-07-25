@@ -20,7 +20,7 @@ inline fun Router.serverApi(
         emptyList<RouteProperty>(), 
         listOf(PathSegment("metric", null, null)), 
         listOf(BuilderQuery("packets", false, null, "", List::class.java, arrayReader<MetricPacket>(MetricPacket.reader)), BuilderQuery("ip", false, null, "", IPAddress::class.java, null)), 
-        listOf(pluginMap["IPPlugin"]!!), 
+        listOf(pluginMap["AddressPlugin"]!!), 
         null, 
         { metric(it[0] as List<MetricPacket>, it[1] as IPAddress) }
     )

@@ -13,8 +13,8 @@ import com.rimmer.metrics.server.generated.type.*
 
 fun BinaryClient.clientGetStats(from: Long, to: Long, password: String, callback: (List<TimeMetric>?, Throwable?) -> Unit) {
     call(
-        -1537045299, {
-            val header0 = 2120
+        896073641, {
+            val header0 = 265
             this.writeVarInt(header0)
             this.writeVarLong(from)
             this.writeVarLong(to)
@@ -40,8 +40,8 @@ fun BinaryClient.clientGetStats(from: Long, to: Long, password: String): Task<Li
 
 fun BinaryClient.clientGetProfile(from: Long, to: Long, password: String, callback: (List<TimeProfile>?, Throwable?) -> Unit) {
     call(
-        198807319, {
-            val header0 = 2120
+        1963899635, {
+            val header0 = 265
             this.writeVarInt(header0)
             this.writeVarLong(from)
             this.writeVarLong(to)
@@ -67,8 +67,8 @@ fun BinaryClient.clientGetProfile(from: Long, to: Long, password: String): Task<
 
 fun BinaryClient.clientGetError(from: Long, password: String, callback: (List<ErrorClass>?, Throwable?) -> Unit) {
     call(
-        -1958242560, {
-            val header0 = 264
+        -423376220, {
+            val header0 = 33
             this.writeVarInt(header0)
             this.writeVarLong(from)
             this.writeString(password)

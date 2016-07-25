@@ -26,7 +26,7 @@ data class Event(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 4896
+        val header0 = 612
         buffer.writeVarInt(header0)
         buffer.writeString(type)
         buffer.writeString(description)

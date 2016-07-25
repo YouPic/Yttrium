@@ -27,7 +27,7 @@ data class ErrorInstance(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        var header0 = 2312
+        var header0 = 289
         if(path == null) {
             header0 = header0 and -449
         }

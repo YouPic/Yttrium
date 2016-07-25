@@ -27,7 +27,7 @@ data class CategoryMetric(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 424
+        val header0 = 53
         buffer.writeVarInt(header0)
         metric.encodeBinary(buffer)
         buffer.writeVarLong((paths.size.toLong() shl 6) or 4 or (5 shl 3))

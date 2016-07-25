@@ -32,7 +32,7 @@ data class TimeProfile(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 392
+        val header0 = 49
         buffer.writeVarInt(header0)
         buffer.writeVarLong(time.millis)
         buffer.writeVarLong((servers.size.toLong() shl 6) or 4 or (6 shl 3))

@@ -22,7 +22,7 @@ data class ProfileStat(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 360
+        val header0 = 45
         buffer.writeVarInt(header0)
         normal.encodeBinary(buffer)
         max.encodeBinary(buffer)

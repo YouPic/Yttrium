@@ -30,7 +30,7 @@ data class ProfileEntry(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 3656
+        val header0 = 457
         buffer.writeVarInt(header0)
         buffer.writeVarLong(start)
         buffer.writeVarLong(end)

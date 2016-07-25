@@ -41,7 +41,7 @@ data class ErrorClass(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 201312
+        val header0 = 25164
         buffer.writeVarInt(header0)
         buffer.writeString(cause)
         buffer.writeVarInt(count)

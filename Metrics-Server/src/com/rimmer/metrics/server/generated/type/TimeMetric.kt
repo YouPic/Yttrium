@@ -30,7 +30,7 @@ data class TimeMetric(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 3400
+        val header0 = 425
         buffer.writeVarInt(header0)
         buffer.writeVarLong(time.millis)
         metric.encodeBinary(buffer)

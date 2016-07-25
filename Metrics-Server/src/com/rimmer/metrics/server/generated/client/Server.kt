@@ -13,8 +13,8 @@ import com.rimmer.metrics.server.generated.type.*
 
 fun BinaryClient.serverMetric(packets: List<MetricPacket>, callback: (Unit?, Throwable?) -> Unit) {
     call(
-        821579075, {
-            val header0 = 56
+        -1500814561, {
+            val header0 = 7
             this.writeVarInt(header0)
             this.writeVarLong((packets.size.toLong() shl 3) or 5)
             for(o in packets) {
