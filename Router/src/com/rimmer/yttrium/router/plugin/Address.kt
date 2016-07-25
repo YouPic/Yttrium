@@ -16,7 +16,8 @@ class AddressPlugin: Plugin<Int> {
     override val name = "AddressPlugin"
 
     override fun modifyRoute(modifier: RouteModifier, properties: List<RouteProperty>): Int {
-        return modifier.provide(IPAddress::class.java)
+        return modifier.provide(IPAddress::class.java) ?:
+            throw IllegalArgumentException("No parameter of type IPAddress exists.")
     }
 
     override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {

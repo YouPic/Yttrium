@@ -70,8 +70,8 @@ interface RouteModifier {
     }
 
     /** If a parameter of the requested type exists, provide it and return its index. */
-    fun provide(type: Class<*>): Int {
-        val i = hasParameter(type) ?: throw IllegalArgumentException("No parameter of type $type exists.")
+    fun provide(type: Class<*>): Int? {
+        val i = hasParameter(type) ?: return null
         provideParameter(i)
         return i
     }
