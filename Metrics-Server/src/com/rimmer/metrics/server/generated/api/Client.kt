@@ -20,30 +20,27 @@ inline fun Router.clientApi(
     addRoute(
         HttpMethod.GET, 0, 
         listOf(RouteProperty("password", true)), 
-        listOf(PathSegment("stats", null), PathSegment("from", longReader), PathSegment("to", longReader)), 
+        listOf(PathSegment("stats", null, null), PathSegment("from", Long::class.java, longReader), PathSegment("to", Long::class.java, longReader)), 
         emptyList<BuilderQuery>(), 
         listOf(pluginMap["PasswordPlugin"]!!), 
-        arrayOf(longReader, longReader), 
         arrayWriter<TimeMetric>(null), 
         { getStats(it[0] as Long, it[1] as Long) }
     )
     addRoute(
         HttpMethod.GET, 0, 
         listOf(RouteProperty("password", true)), 
-        listOf(PathSegment("profile", null), PathSegment("from", longReader), PathSegment("to", longReader)), 
+        listOf(PathSegment("profile", null, null), PathSegment("from", Long::class.java, longReader), PathSegment("to", Long::class.java, longReader)), 
         emptyList<BuilderQuery>(), 
         listOf(pluginMap["PasswordPlugin"]!!), 
-        arrayOf(longReader, longReader), 
         arrayWriter<TimeProfile>(null), 
         { getProfile(it[0] as Long, it[1] as Long) }
     )
     addRoute(
         HttpMethod.GET, 0, 
         listOf(RouteProperty("password", true)), 
-        listOf(PathSegment("error", null), PathSegment("from", longReader)), 
+        listOf(PathSegment("error", null, null), PathSegment("from", Long::class.java, longReader)), 
         emptyList<BuilderQuery>(), 
         listOf(pluginMap["PasswordPlugin"]!!), 
-        arrayOf(longReader), 
         arrayWriter<ErrorClass>(null), 
         { getError(it[0] as Long) }
     )

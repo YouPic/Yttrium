@@ -60,7 +60,7 @@ class PasswordPlugin(val password: String): Plugin<Int> {
     override val name = "PasswordPlugin"
 
     override fun modifyRoute(modifier: RouteModifier, properties: List<RouteProperty>): Int {
-        return modifier.addArg("password", stringReader)
+        return modifier.addArg("password", String::class.java, stringReader)
     }
 
     override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {

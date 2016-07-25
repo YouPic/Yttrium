@@ -53,7 +53,7 @@ class BinaryRouter(
                     false
                 } else if(it > paramCount) {
                     val i = it - paramCount
-                    queries[i] = route.queries[i].reader.fromBinary(source)
+                    queries[i] = route.queries[i].reader!!.fromBinary(source)
                     true
                 } else {
                     params[it] = route.typedSegments[it].reader!!.fromBinary(source)

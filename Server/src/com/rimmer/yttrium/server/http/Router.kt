@@ -233,9 +233,9 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             // Check if this parameter is used.
             val name = q.sliceHash(0, separator)
             params.forEachIndexed { i, query ->
-                if(query.hash == name && query.reader.target !== BodyContent::class.java) {
+                if(query.hash == name && query.type !== BodyContent::class.java) {
                     val string = URLDecoder.decode(q.substring(separator + 1), "UTF-8")
-                    values[i] = readPrimitive(string, query.reader.target)
+                    values[i] = readPrimitive(string, query.type)
                 }
             }
         }
@@ -258,18 +258,18 @@ fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>)
             // Check if this parameter is recognized.
             val name = p.name.hashCode()
             route.queries.forEachIndexed { i, query ->
-                if(query.hash == name && query.reader.target !== BodyContent::class.java) {
+                if(query.hash == name && query.type !== BodyContent::class.java) {
                     val buffer = p.byteBuf
                     val index = buffer.readerIndex()
 
                     // This is a bit ugly - we don't really know if the provided data is json or raw,
                     // so we just try parsing it in both ways.
                     try {
-                        queries[i] = query.reader.fromJson(JsonToken(buffer))
+                        queries[i] = query.reader!!.fromJson(JsonToken(buffer))
                     } catch(e: Throwable) {
                         buffer.readerIndex(index)
                         try {
-                            queries[i] = readPrimitive(buffer.string, query.reader.target)
+                            queries[i] = readPrimitive(buffer.string, query.type)
                         } catch(e: Throwable) {
                             // If both parsing tries failed, we set the exception to be propagated if needed.
                             if(error == null) {
@@ -299,7 +299,7 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
                     val name = json.stringPayload.hashCode()
                     var found = false
                     route.queries.forEachIndexed { i, query ->
-                        if(query.hash == name && query.reader.target !== BodyContent::class.java) {
+                        if(query.hash == name && query.type !== BodyContent::class.java) {
                             found = true
                             val offset = buffer.readerIndex()
 
@@ -307,14 +307,14 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
                                 // Sometimes body parameters are inside a json string, which we need to support.
                                 // Since we can't know which one it is, we have to try both...
                                 try {
-                                    queries[i] = query.reader.fromJson(json)
+                                    queries[i] = query.reader!!.fromJson(json)
                                 } catch(e: Throwable) {
                                     buffer.readerIndex(offset)
                                     json.parse()
-                                    queries[i] = query.reader.fromJson(JsonToken(json.stringPayload.byteBuf))
+                                    queries[i] = query.reader!!.fromJson(JsonToken(json.stringPayload.byteBuf))
                                 }
                             } else {
-                                queries[i] = query.reader.fromJson(json)
+                                queries[i] = query.reader!!.fromJson(json)
                             }
                         }
                     }
@@ -343,7 +343,7 @@ fun checkQueries(route: Route, args: Array<Any?>, parseError: Throwable?) {
                 args[i] = query.default
             } else {
                 val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
-                val type = "of type ${query.reader.target.simpleName}"
+                val type = "of type ${query.type.simpleName}"
                 val error = if(parseError != null) "due to $parseError" else ""
                 throw InvalidStateException(
                     "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type $error"

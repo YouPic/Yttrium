@@ -36,7 +36,7 @@ class Route(
 /** Interface that can be used by plugins to modify the signature of a route. */
 interface RouteModifier {
     /** The parameter types that need to be provided to the route handler. */
-    val parameterReaders: Array<Reader?>
+    val parameterTypes: Array<Class<*>>
 
     /**
      * Indicates that this plugin will provide this parameter to the route handler.
@@ -55,17 +55,17 @@ interface RouteModifier {
      * Adds an additional query parameter.
      * @return The id of the created query. This can be used to retrieve it in modifyCall.
      */
-    fun addArg(name: String, reader: Reader, description: String = ""): Int
+    fun addArg(name: String, type: Class<*>, reader: Reader, description: String = ""): Int
 
     /**
      * Adds an additional optional query parameter.
      * @return The id of the created query. This can be used to retrieve it in modifyCall.
      */
-    fun addOptional(name: String, reader: Reader, default: Any? = null, description: String = ""): Int
+    fun addOptional(name: String, type: Class<*>, reader: Reader, default: Any? = null, description: String = ""): Int
 
     /** Returns the index of the first argument of the provided type, or null. */
     fun hasParameter(type: Class<*>): Int? {
-        val i = parameterReaders.indexOfFirst { it?.target === type }
+        val i = parameterTypes.indexOfFirst { it === type }
         return if(i == -1) null else i
     }
 
@@ -94,7 +94,8 @@ class RouteProperty(val name: String, val value: Any)
 class RouteQuery(
     val name: String,
     val hash: Int,
-    val reader: Reader,
+    val type: Class<*>,
+    val reader: Reader?,
     val optional: Boolean,
     val default: Any?,
     val description: String
