@@ -42,6 +42,7 @@ fun <T> arrayWriter(writer: Writer<T>?) = if(writer === null) {
     Writer<List<T>>({
         startArray()
         for(i in it) {
+            arrayField()
             (i as Writable).encodeJson(this)
         }
         endArray()
@@ -54,6 +55,7 @@ fun <T> arrayWriter(writer: Writer<T>?) = if(writer === null) {
     Writer<List<T>>({
         startArray()
         for(i in it) {
+            arrayField()
             writer.toJson(this, i)
         }
         endArray()
@@ -67,9 +69,9 @@ fun <T> arrayWriter(writer: Writer<T>?) = if(writer === null) {
 fun <V> mapWriter(writer: Writer<V>?) = if(writer == null) {
     Writer<Map<String, V>>({
         startObject()
-        for(i in it) {
-            field(i.key)
-            (i.value as Writable).encodeJson(this)
+        for((key, value) in it) {
+            field(key)
+            (value as Writable).encodeJson(this)
         }
         endObject()
     }, {
@@ -82,9 +84,9 @@ fun <V> mapWriter(writer: Writer<V>?) = if(writer == null) {
 } else {
     Writer<Map<String, V>>({
         startObject()
-        for(i in it) {
-            field(i.key)
-            writer.toJson(this, i.value)
+        for((key, value) in it) {
+            field(key)
+            writer.toJson(this, value)
         }
         endObject()
     }, {
