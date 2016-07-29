@@ -22,7 +22,7 @@ class SQLPool(
     init {
         // We initialize the pool at creation to avoid synchronization when lazily creating pools.
         val map = HashMap<EventLoop, SingleThreadPool>()
-        context.acceptorGroup.forEach { loop ->
+        context.handlerGroup.forEach { loop ->
             if(loop is EventLoop) {
                 map[loop] = SingleThreadPool(config) { creator(loop, it) }
             }
