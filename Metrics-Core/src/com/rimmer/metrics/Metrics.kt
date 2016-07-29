@@ -194,6 +194,17 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
         }
     }
 
+    /**
+     * Indicates that an error occurred within a call,
+     * but that the error did not cause the path to fail.
+     * Most of the time this means that the resource state is correct but a side-effect of the call failed.
+     */
+    fun error(call: Int, category: String, reason: String, description: String = "") {
+        getCall(call)?.run {
+            logError(category, path, reason, description, "", false)
+        }
+    }
+
     override fun startEvent(call: Int, type: String, description: String): Int {
         val startTime = System.nanoTime()
         return getCall(call)?.run {
