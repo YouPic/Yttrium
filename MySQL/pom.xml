@@ -54,7 +54,7 @@
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>Yttrium-Core</artifactId>
+            <artifactId>Yttrium-Server</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
