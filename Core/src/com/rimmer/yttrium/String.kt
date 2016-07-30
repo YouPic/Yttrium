@@ -26,13 +26,13 @@ interface ByteString: List<Byte> {
 /** Contains a byte string in local jvm memory. */
 class LocalByteString(private val bytes: ByteArray): ByteString {
     override fun hashCode(): Int {
-        var h = 0;
+        var h = 0
         if(bytes.size > 0) {
             for(b in bytes) {
                 h = 31 * h + b
             }
         }
-        return h;
+        return h
     }
 
     override fun equals(other: Any?): Boolean {
@@ -40,7 +40,7 @@ class LocalByteString(private val bytes: ByteArray): ByteString {
             return true
         }
         if(other is ByteString && bytes.size == other.size) {
-            for(i in 0..bytes.size) {
+            for(i in 0..bytes.size-1) {
                 if(bytes[i] != other[i]) return false
             }
             return true
@@ -111,7 +111,7 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
             return true
         }
         if(other is ByteString && size == other.size) {
-            for(i in 0..size) {
+            for(i in 0..size-1) {
                 if(this[i] != other[i]) return false
             }
             return true
