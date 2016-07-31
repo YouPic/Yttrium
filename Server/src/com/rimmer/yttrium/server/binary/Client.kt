@@ -50,6 +50,9 @@ interface BinaryClient {
 
     /** The amount of time in milliseconds that has passed since receiving data from the server. */
     val responseTimer: Long
+
+    /** The number of pending requests this client is currently waiting for. */
+    val pendingRequests: Int
 }
 
 fun connectBinary(
@@ -71,9 +74,11 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     private val requests = ArrayList<Request<in Any>?>()
     private var nextRequest = 0
     private var lastResponse = 0L
+    private var pendingCount = 0
 
     override val connected: Boolean get() = context != null && context!!.channel().isActive
     override val responseTimer: Long get() = if(context == null) 0 else System.currentTimeMillis() - lastResponse
+    override val pendingRequests: Int get() = pendingCount
 
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
@@ -139,6 +144,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     }
 
     private fun addRequest(r: Request<in Any>): Int {
+        pendingCount++
         val i = nextRequest
         if(i >= requests.size) {
             requests.add(r)
@@ -155,6 +161,7 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     private fun finishRequest(request: Int) {
         requests[request] = null
         nextRequest = request
+        pendingCount--
     }
 
     private fun mapResponse(request: Request<in Any>, packet: ByteBuf) {
