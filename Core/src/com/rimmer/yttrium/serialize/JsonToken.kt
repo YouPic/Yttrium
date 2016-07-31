@@ -3,6 +3,7 @@ package com.rimmer.yttrium.serialize
 import com.rimmer.yttrium.ByteStringBuilder
 import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.emptyString
+import com.rimmer.yttrium.utf8
 import io.netty.buffer.ByteBuf
 
 /** Represents a json token with parsing functionality. */
@@ -32,11 +33,17 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
         // We add a conversion here as a special case.
         if(type === Type.NumberLit && this.type === Type.StringLit) {
             try {
-                numberPayload = java.lang.Double.parseDouble(stringPayload)
+                numberPayload = java.lang.Double.parseDouble(
+                    if(useByteString) byteStringPayload.utf16() else stringPayload
+                )
                 this.type = type
             } catch(e: NumberFormatException) {
                 // If this happens the type will be wrong and we throw an exception later.
             }
+        } else if(type === Type.StringLit && this.type === Type.NumberLit) {
+            stringPayload = numberPayload.toString()
+            if(useByteString) byteStringPayload = stringPayload.utf8
+            this.type = type
         }
 
         if(this.type !== type || (this.type === Type.NullLit && !allowNull)) {
