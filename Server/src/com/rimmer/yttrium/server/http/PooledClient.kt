@@ -34,7 +34,7 @@ class HttpPooledClient(context: ServerContext) {
         url: String,
         headers: HttpHeaders? = null,
         body: Any? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        contentType: AsciiString? = HttpHeaderValues.APPLICATION_JSON,
         listener: HttpListener? = null
     ) = request(context, url, HttpMethod.POST, headers, body, contentType, listener)
 
@@ -43,7 +43,7 @@ class HttpPooledClient(context: ServerContext) {
         url: String,
         headers: HttpHeaders? = null,
         body: Any? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        contentType: AsciiString? = HttpHeaderValues.APPLICATION_JSON,
         listener: HttpListener? = null
     ) = request(context, url, HttpMethod.PUT, headers, body, contentType, listener)
 
@@ -52,7 +52,7 @@ class HttpPooledClient(context: ServerContext) {
         url: String,
         headers: HttpHeaders? = null,
         body: Any? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        contentType: AsciiString? = HttpHeaderValues.APPLICATION_JSON,
         listener: HttpListener? = null
     ) = request(context, url, HttpMethod.DELETE, headers, body, contentType, listener)
 
@@ -62,7 +62,7 @@ class HttpPooledClient(context: ServerContext) {
         method: HttpMethod,
         headers: HttpHeaders? = null,
         body: Any? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        contentType: AsciiString? = HttpHeaderValues.APPLICATION_JSON,
         listener: HttpListener? = null
     ): Task<HttpResult> {
         val loop = context.eventLoop
@@ -101,17 +101,22 @@ class HttpPooledClient(context: ServerContext) {
         }
 
         val httpHeaders = request.headers()
-        httpHeaders[HttpHeaderNames.HOST] = domain
-
-        if(body !== null) {
-            httpHeaders[HttpHeaderNames.CONTENT_TYPE] = contentType
-            if(headers !== null && !headers.contains(HttpHeaderNames.CONTENT_LENGTH) && body is ByteBuf) {
-                httpHeaders[HttpHeaderNames.CONTENT_LENGTH] = body.writerIndex()
-            }
-        }
-
         if(headers !== null) {
             httpHeaders.add(headers)
+        }
+
+        if(!httpHeaders.contains(HttpHeaderNames.HOST)) {
+            httpHeaders[HttpHeaderNames.HOST] = domain
+        }
+
+        if(body !== null) {
+            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                httpHeaders[HttpHeaderNames.CONTENT_TYPE] = contentType
+            }
+
+            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && body is ByteBuf) {
+                httpHeaders[HttpHeaderNames.CONTENT_LENGTH] = body.writerIndex()
+            }
         }
 
         val task = Task<HttpResult>()
