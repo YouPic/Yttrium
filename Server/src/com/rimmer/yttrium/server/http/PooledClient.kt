@@ -26,41 +26,45 @@ class HttpPooledClient(context: ServerContext) {
         pools = map
     }
 
-    fun get(context: Context, url: String, headers: HttpHeaders? = null) =
-        request(context, url, HttpMethod.GET, headers)
+    fun get(context: Context, url: String, headers: HttpHeaders? = null, listener: HttpListener? = null) =
+        request(context, url, HttpMethod.GET, headers, listener = listener)
 
     fun post(
         context: Context,
         url: String,
         headers: HttpHeaders? = null,
-        body: ByteBuf? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON
-    ) = request(context, url, HttpMethod.POST, headers, body, contentType)
+        body: Any? = null,
+        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        listener: HttpListener? = null
+    ) = request(context, url, HttpMethod.POST, headers, body, contentType, listener)
 
     fun put(
         context: Context,
         url: String,
         headers: HttpHeaders? = null,
-        body: ByteBuf? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON
-    ) = request(context, url, HttpMethod.PUT, headers, body, contentType)
+        body: Any? = null,
+        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        listener: HttpListener? = null
+    ) = request(context, url, HttpMethod.PUT, headers, body, contentType, listener)
 
     fun delete(
         context: Context,
         url: String,
         headers: HttpHeaders? = null,
-        body: ByteBuf? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON
-    ) = request(context, url, HttpMethod.DELETE, headers, body, contentType)
+        body: Any? = null,
+        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        listener: HttpListener? = null
+    ) = request(context, url, HttpMethod.DELETE, headers, body, contentType, listener)
 
     fun request(
         context: Context,
         url: String,
         method: HttpMethod,
         headers: HttpHeaders? = null,
-        body: ByteBuf? = null,
-        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON
-    ): Task<FullHttpResponse> {
+        body: Any? = null,
+        contentType: AsciiString = HttpHeaderValues.APPLICATION_JSON,
+        listener: HttpListener? = null
+    ): Task<HttpResult> {
         val loop = context.eventLoop
         val pool = pools[loop] ?:
             throw IllegalArgumentException("Invalid context event loop - the event loop must be in the server's handlerGroup.")
@@ -93,7 +97,7 @@ class HttpPooledClient(context: ServerContext) {
         val request = if(body === null) {
             DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path)
         } else {
-            DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path, body)
+            DefaultHttpRequest(HttpVersion.HTTP_1_1, method, path)
         }
 
         val httpHeaders = request.headers()
@@ -101,7 +105,7 @@ class HttpPooledClient(context: ServerContext) {
 
         if(body !== null) {
             httpHeaders[HttpHeaderNames.CONTENT_TYPE] = contentType
-            if(headers !== null && !headers.contains(HttpHeaderNames.CONTENT_LENGTH)) {
+            if(headers !== null && !headers.contains(HttpHeaderNames.CONTENT_LENGTH) && body is ByteBuf) {
                 httpHeaders[HttpHeaderNames.CONTENT_LENGTH] = body.writerIndex()
             }
         }
@@ -110,17 +114,10 @@ class HttpPooledClient(context: ServerContext) {
             httpHeaders.add(headers)
         }
 
-        val task = Task<FullHttpResponse>()
+        val task = Task<HttpResult>()
         client.get { c, e ->
             if(e == null) {
-                c!!.request(request) { r, e ->
-                    c.close()
-                    if(e == null) {
-                        task.finish(r!!)
-                    } else {
-                        task.fail(e)
-                    }
-                }
+                c!!.request(request, body, wrappedListener(task, listener, c))
             } else {
                 task.fail(e)
             }

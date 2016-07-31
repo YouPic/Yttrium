@@ -3,6 +3,7 @@ package com.rimmer.yttrium.server.http
 import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
 import com.rimmer.yttrium.server.ServerContext
+import io.netty.buffer.ByteBuf
 import io.netty.channel.EventLoop
 import io.netty.channel.EventLoopGroup
 import io.netty.handler.codec.http.FullHttpResponse
@@ -171,18 +172,12 @@ class HttpPool(
     }
 }
 
-fun HttpPool.request(context: Context, request: HttpRequest): Task<FullHttpResponse> {
-    val task = Task<FullHttpResponse>()
+fun HttpPool.request(context: Context, request: HttpRequest, listener: HttpListener? = null): Task<HttpResult> {
+    val task = Task<HttpResult>()
+
     this[context].get { c, e ->
         if(e == null) {
-            c!!.request(request) { r, e ->
-                c.close()
-                if (e == null) {
-                    task.finish(r!!)
-                } else {
-                    task.fail(e)
-                }
-            }
+            c!!.request(request, null, wrappedListener(task, listener, c))
         } else {
             task.fail(e)
         }
@@ -190,18 +185,11 @@ fun HttpPool.request(context: Context, request: HttpRequest): Task<FullHttpRespo
     return task
 }
 
-fun HttpPool.request(context: Context, method: HttpMethod, path: String): Task<FullHttpResponse> {
-    val task = Task<FullHttpResponse>()
+fun HttpPool.request(context: Context, method: HttpMethod, path: String, listener: HttpListener? = null): Task<HttpResult> {
+    val task = Task<HttpResult>()
     this[context].get { c, e ->
         if(e == null) {
-            c!!.request(method, path) { r, e ->
-                c.close()
-                if (e == null) {
-                    task.finish(r!!)
-                } else {
-                    task.fail(e)
-                }
-            }
+            c!!.request(method, path, wrappedListener(task, listener, c))
         } else {
             task.fail(e)
         }
@@ -209,18 +197,11 @@ fun HttpPool.request(context: Context, method: HttpMethod, path: String): Task<F
     return task
 }
 
-fun HttpPool.request(context: Context, method: HttpMethod, path: String, body: Any): Task<FullHttpResponse> {
-    val task = Task<FullHttpResponse>()
+fun HttpPool.request(context: Context, method: HttpMethod, path: String, body: Any, listener: HttpListener? = null): Task<HttpResult> {
+    val task = Task<HttpResult>()
     this[context].get { c, e ->
         if(e == null) {
-            c!!.request(method, path, body) { r, e ->
-                c.close()
-                if (e == null) {
-                    task.finish(r!!)
-                } else {
-                    task.fail(e)
-                }
-            }
+            c!!.request(method, path, body, wrappedListener(task, listener, c))
         } else {
             task.fail(e)
         }
@@ -228,21 +209,47 @@ fun HttpPool.request(context: Context, method: HttpMethod, path: String, body: A
     return task
 }
 
-fun HttpPool.request(context: Context, method: HttpMethod, path: String, body: Array<Pair<String, Any>>): Task<FullHttpResponse> {
-    val task = Task<FullHttpResponse>()
+fun HttpPool.request(context: Context, method: HttpMethod, path: String, body: Array<Pair<String, Any>>, listener: HttpListener? = null): Task<HttpResult> {
+    val task = Task<HttpResult>()
     this[context].get { c, e ->
         if(e == null) {
-            c!!.request(method, path, body) { r, e ->
-                c.close()
-                if (e == null) {
-                    task.finish(r!!)
-                } else {
-                    task.fail(e)
-                }
-            }
+            c!!.request(method, path, body, wrappedListener(task, listener, c))
         } else {
             task.fail(e)
         }
     }
     return task
+}
+
+internal fun wrappedListener(task: Task<HttpResult>, listener: HttpListener?, connection: HttpClient): HttpListener {
+    return if(listener === null) {
+        object : HttpListener {
+            override fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {
+                if(finished) {
+                    connection.close()
+                    task.finish(result)
+                }
+            }
+            override fun onError(error: Throwable) { task.fail(error) }
+        }
+    } else {
+        object : HttpListener {
+            override fun onResult(result: HttpResult) {
+                listener.onResult(result)
+            }
+
+            override fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {
+                listener.onContent(result, content, finished)
+                if(finished) {
+                    connection.close()
+                    task.finish(result)
+                }
+            }
+
+            override fun onError(error: Throwable) {
+                listener.onError(error)
+                task.fail(error)
+            }
+        }
+    }
 }
