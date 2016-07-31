@@ -2,6 +2,7 @@ package com.rimmer.yttrium.server.http
 
 import com.rimmer.yttrium.serialize.writeJson
 import com.rimmer.yttrium.server.connect
+import com.rimmer.yttrium.string
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.channel.ChannelHandlerContext
@@ -34,6 +35,7 @@ interface HttpListener {
     /**
      * Receives response data. This is called at least once.
      * This can be called multiple times with chunks of the response.
+     * The content buffer is released after this.
      * @param finished If set, this is the last chunk and request has finished.
      */
     fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {}
@@ -44,6 +46,13 @@ interface HttpListener {
      * but not once the request has finished.
      */
     fun onError(error: Throwable) {}
+}
+
+/** Http listener that appends to a string. */
+open class ToStringListener(val string: StringBuilder): HttpListener {
+    override fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {
+        string.append(content.string)
+    }
 }
 
 interface HttpClient {
@@ -134,6 +143,7 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ss
             } else false
 
             listener?.onContent(result, message.content(), finished)
+            message.content().release()
         }
     }
 
