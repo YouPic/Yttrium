@@ -31,26 +31,17 @@ class HttpHandler(
         try {
             if(message is FullHttpRequest) {
                 if(cors && message.method() === HttpMethod.OPTIONS) {
-                    val response = DefaultFullHttpResponse(
+                    sendResponse(context, DefaultFullHttpResponse(
                         HttpVersion.HTTP_1_1,
                         HttpResponseStatus.OK,
                         Unpooled.EMPTY_BUFFER
-                    )
-                    handleCors(response.headers())
-                    context.writeAndFlush(response)
+                    ), 0)
                     return
                 }
 
                 f(context, message) {
-                    handleCors(it.headers())
-                    if(HttpUtil.isKeepAlive(message)) {
-                        val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
-                        it.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength)
-                        it.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
-                        context.writeAndFlush(it, context.voidPromise())
-                    } else {
-                        context.writeAndFlush(it).addListener(ChannelFutureListener.CLOSE)
-                    }
+                    val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
+                    sendResponse(context, it, contentLength)
                 }
             }
         } finally {
@@ -71,10 +62,23 @@ class HttpHandler(
         }
     }
 
+    private fun sendResponse(context: ChannelHandlerContext, response: HttpResponse, length: Int) {
+        val headers = response.headers()
+        handleCors(headers)
+
+        if(HttpUtil.isKeepAlive(response)) {
+            headers.set(HttpHeaderNames.CONTENT_LENGTH, length)
+            headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
+            context.writeAndFlush(response, context.voidPromise())
+        } else {
+            context.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE)
+        }
+    }
+
     companion object {
         val allowedHeaders = AsciiString.of("Accept,API-VERSION,Content-Type")
         val allowedMethods = AsciiString.of("DELETE,POST,GET,PUT")
         val allowedOrigin = AsciiString.of("*")
-        val allowedAge = AsciiString.of("3600")
+        val allowedAge = AsciiString.of("3628800")
     }
 }
