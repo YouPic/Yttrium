@@ -7,9 +7,7 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelPipeline
 import io.netty.handler.codec.http.*
-import io.netty.handler.codec.http.cors.CorsConfig
-import io.netty.handler.codec.http.cors.CorsConfigBuilder
-import io.netty.handler.codec.http.cors.CorsHandler
+import io.netty.util.AsciiString
 import io.netty.util.ReferenceCountUtil
 
 fun listenHttp(
@@ -20,29 +18,30 @@ fun listenHttp(
     handler: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit
 ) = listen(context, port) {
     addLast(HttpResponseEncoder(), HttpRequestDecoder())
-
-    if(cors) {
-        addLast(CorsHandler(CorsConfigBuilder.forAnyOrigin()
-            .allowedRequestHeaders("Accept", "Content-Type", "API-VERSION")
-            .allowedRequestMethods(HttpMethod.GET, HttpMethod.PUT, HttpMethod.POST, HttpMethod.DELETE)
-            .build()))
-    }
-
-    addLast(HttpObjectAggregator(10 * 1024 * 1024), HttpHandler(handler))
+    addLast(HttpObjectAggregator(10 * 1024 * 1024), HttpHandler(handler, cors))
     pipeline?.invoke(this)
 }
 
-class HttpHandler(val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit): ChannelInboundHandlerAdapter() {
+class HttpHandler(
+    val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit,
+    val cors: Boolean
+): ChannelInboundHandlerAdapter() {
     override fun channelRead(context: ChannelHandlerContext, message: Any) {
         try {
-            if(message is FullHttpRequest) f(context, message) {
-                if(HttpUtil.isKeepAlive(message)) {
-                    val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
-                    it.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength)
-                    it.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
-                    context.writeAndFlush(it, context.voidPromise())
-                } else {
-                    context.writeAndFlush(it).addListener(ChannelFutureListener.CLOSE)
+            if(message is FullHttpRequest) {
+                if(message.method() === HttpMethod.OPTIONS && cors) {
+                    return handleCors(context)
+                }
+
+                f(context, message) {
+                    if(HttpUtil.isKeepAlive(message)) {
+                        val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
+                        it.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength)
+                        it.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
+                        context.writeAndFlush(it, context.voidPromise())
+                    } else {
+                        context.writeAndFlush(it).addListener(ChannelFutureListener.CLOSE)
+                    }
                 }
             }
         } finally {
@@ -52,5 +51,24 @@ class HttpHandler(val f: (ChannelHandlerContext, FullHttpRequest, (HttpResponse)
 
     override fun channelReadComplete(context: ChannelHandlerContext) {
         context.flush()
+    }
+
+    private fun handleCors(context: ChannelHandlerContext) {
+        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        val headers = response.headers()
+        headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN)
+        headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_HEADERS, allowedHeaders)
+        headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_METHODS, allowedMethods)
+        headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin)
+        headers.set(HttpHeaderNames.ACCESS_CONTROL_MAX_AGE, allowedAge)
+
+        context.writeAndFlush(response)
+    }
+
+    companion object {
+        val allowedHeaders = AsciiString.of("Accept,API-VERSION,Content-Type")
+        val allowedMethods = AsciiString.of("DELETE,POST,GET,PUT")
+        val allowedOrigin = AsciiString.of("*")
+        val allowedAge = AsciiString.of("3600")
     }
 }
