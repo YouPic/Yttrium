@@ -48,8 +48,15 @@ interface HttpListener {
     fun onError(error: Throwable) {}
 }
 
+/** Http listener that appends to a buffer. */
+open class BufferListener(val buffer: ByteBuf): HttpListener {
+    override fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {
+        buffer.writeBytes(content)
+    }
+}
+
 /** Http listener that appends to a string. */
-open class ToStringListener(val string: StringBuilder): HttpListener {
+open class StringListener(val string: StringBuilder): HttpListener {
     override fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {
         string.append(content.string)
     }
