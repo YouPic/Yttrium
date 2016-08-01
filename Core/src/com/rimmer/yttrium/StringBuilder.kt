@@ -76,11 +76,7 @@ class ByteStringBuilder {
         val len = str.size
         ensureCapacity(count + len)
 
-        for(b in str) {
-            appendFast(b)
-        }
-
-        count += len
+        for(b in str) appendFast(b)
         return this
     }
 
