@@ -2,6 +2,7 @@ package com.rimmer.yttrium.server.http
 
 import com.rimmer.yttrium.server.ServerContext
 import com.rimmer.yttrium.server.listen
+import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelFutureListener
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
@@ -29,11 +30,19 @@ class HttpHandler(
     override fun channelRead(context: ChannelHandlerContext, message: Any) {
         try {
             if(message is FullHttpRequest) {
-                if(message.method() === HttpMethod.OPTIONS && cors) {
-                    return handleCors(context)
+                if(cors && message.method() === HttpMethod.OPTIONS) {
+                    val response = DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1,
+                        HttpResponseStatus.OK,
+                        Unpooled.EMPTY_BUFFER
+                    )
+                    handleCors(response.headers())
+                    context.writeAndFlush(response)
+                    return
                 }
 
                 f(context, message) {
+                    handleCors(it.headers())
                     if(HttpUtil.isKeepAlive(message)) {
                         val contentLength = (it as? FullHttpResponse)?.content()?.readableBytes() ?: 0
                         it.headers().set(HttpHeaderNames.CONTENT_LENGTH, contentLength)
@@ -53,16 +62,13 @@ class HttpHandler(
         context.flush()
     }
 
-    private fun handleCors(context: ChannelHandlerContext) {
-        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
-        val headers = response.headers()
-        headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN)
-        headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_HEADERS, allowedHeaders)
-        headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_METHODS, allowedMethods)
-        headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin)
-        headers.set(HttpHeaderNames.ACCESS_CONTROL_MAX_AGE, allowedAge)
-
-        context.writeAndFlush(response)
+    private fun handleCors(headers: HttpHeaders) {
+        if(cors) {
+            headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_HEADERS, allowedHeaders)
+            headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_METHODS, allowedMethods)
+            headers.set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, allowedOrigin)
+            headers.set(HttpHeaderNames.ACCESS_CONTROL_MAX_AGE, allowedAge)
+        }
     }
 
     companion object {
