@@ -5,6 +5,8 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
 import com.rimmer.yttrium.router.HttpMethod
+import com.rimmer.yttrium.serialize.JsonWriter
+import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*
@@ -42,7 +44,11 @@ fun mapError(error: Throwable?) = when(error) {
 
 /** Creates an error response with the provided error code and text. */
 fun errorResponse(error: HttpResponseStatus, text: String): HttpResponse {
-    val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, error, Unpooled.wrappedBuffer(text.toByteArray()))
-    response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN)
+    val buffer = ByteBufAllocator.DEFAULT.buffer()
+    val json = JsonWriter(buffer)
+    json.startObject().field("error").value(text).endObject()
+
+    val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, error, buffer)
+    response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
     return response
 }
