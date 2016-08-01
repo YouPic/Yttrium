@@ -69,8 +69,8 @@ class ByteStringBuilder {
         value[index] = ch
     }
 
-    fun append(obj: Any?): ByteStringBuilder = append(obj.toString())
-    fun append(s: CharSequence, start: Int, end: Int): ByteStringBuilder = append(s, start, end)
+    fun append(c: String): ByteStringBuilder = append(c.utf8)
+    fun append(s: String, start: Int, end: Int): ByteStringBuilder = append(s.utf8, start, end)
 
     fun append(str: ByteString): ByteStringBuilder {
         val len = str.size
