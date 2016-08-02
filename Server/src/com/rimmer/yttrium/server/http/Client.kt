@@ -160,20 +160,38 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ss
 
     override fun request(request: HttpRequest, body: Any?, listener: HttpListener) {
         this.listener = listener
+        val contentLength: Int
+
         val content = when(body) {
-            is ByteBuf -> DefaultLastHttpContent(body)
-            is String -> DefaultLastHttpContent(body.byteBuf)
+            is ByteBuf -> {
+                contentLength = body.writerIndex()
+                DefaultLastHttpContent(body)
+            }
+            is String -> {
+                val buffer = body.byteBuf
+                contentLength = buffer.writerIndex()
+                DefaultLastHttpContent(buffer)
+            }
             is ByteString -> {
                 val buffer = ByteBufAllocator.DEFAULT.buffer(body.size)
                 body.write(buffer)
+                contentLength = buffer.writerIndex()
                 DefaultLastHttpContent(buffer)
             }
             is Writable -> {
                 val buffer = ByteBufAllocator.DEFAULT.buffer()
                 body.encodeJson(JsonWriter(buffer))
+                contentLength = buffer.writerIndex()
                 DefaultLastHttpContent(buffer)
             }
-            else -> body
+            else -> {
+                contentLength = 0
+                body
+            }
+        }
+
+        if(!request.headers().contains(HttpHeaderNames.CONTENT_LENGTH)) {
+            request.headers()[HttpHeaderNames.CONTENT_LENGTH] = contentLength
         }
 
         if(body === null) {
