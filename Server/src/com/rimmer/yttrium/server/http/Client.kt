@@ -1,5 +1,9 @@
 package com.rimmer.yttrium.server.http
 
+import com.rimmer.yttrium.ByteString
+import com.rimmer.yttrium.byteBuf
+import com.rimmer.yttrium.serialize.JsonWriter
+import com.rimmer.yttrium.serialize.Writable
 import com.rimmer.yttrium.serialize.writeJson
 import com.rimmer.yttrium.server.connect
 import com.rimmer.yttrium.string
@@ -156,7 +160,21 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ss
 
     override fun request(request: HttpRequest, body: Any?, listener: HttpListener) {
         this.listener = listener
-        val content = if(body is ByteBuf) DefaultLastHttpContent(body) else body
+        val content = when(body) {
+            is ByteBuf -> DefaultLastHttpContent(body)
+            is String -> DefaultLastHttpContent(body.byteBuf)
+            is ByteString -> {
+                val buffer = ByteBufAllocator.DEFAULT.buffer(body.size)
+                body.write(buffer)
+                DefaultLastHttpContent(buffer)
+            }
+            is Writable -> {
+                val buffer = ByteBufAllocator.DEFAULT.buffer()
+                body.encodeJson(JsonWriter(buffer))
+                DefaultLastHttpContent(buffer)
+            }
+            else -> body
+        }
 
         if(body === null) {
             context!!.writeAndFlush(request, context!!.voidPromise())
