@@ -168,7 +168,7 @@ class Task<T> {
                 try {
                     val next = fail(e)
                     next.handler = { r, e ->
-                        if (e == null) {
+                        if(e == null) {
                             task.finish(r!!)
                         } else {
                             task.fail(e)
@@ -177,6 +177,21 @@ class Task<T> {
                 } catch(e: Throwable) {
                     task.fail(e)
                 }
+            }
+        }
+        return task
+    }
+
+    /** Runs the provided function whether the task succeeds or not. */
+    inline fun always(crossinline f: (T?, Throwable?) -> Unit): Task<T> {
+        val task = Task<T>()
+        handler = {r, e ->
+            try {
+                f(r, e)
+                if(e === null) (task as Task<T?>).finish(r)
+                else task.fail(e)
+            } catch(e: Throwable) {
+                task.fail(e)
             }
         }
         return task
