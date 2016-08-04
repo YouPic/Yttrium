@@ -105,7 +105,7 @@ class MetricStore {
             0
         } else {
             val index = inFlightTimes.binarySearch {it.time.millis.compareTo(from)}
-            if(index > 0) index else -index
+            if(index > 0) index else -index - 1
         }
 
         val last = if(inFlightTimes.last().time.millis < to) {
@@ -138,7 +138,7 @@ class MetricStore {
             0
         } else {
             val index = inFlightProfiles.binarySearch {it.time.millis.compareTo(from)}
-            if(index > 0) index else -index
+            if(index > 0) index else -index - 1
         }
 
         val last = if(inFlightProfiles.last().time.millis < to) {
