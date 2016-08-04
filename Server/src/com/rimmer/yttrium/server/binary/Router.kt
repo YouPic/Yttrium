@@ -49,16 +49,18 @@ class BinaryRouter(
         // without making everything really complicated,
         // so if the decoding fails we just return a simple error.
         try {
-            source.readObject {
-                if(it > paramCount + queries.size) {
-                    false
-                } else if(it >= paramCount) {
-                    val i = it - paramCount
-                    queries[i] = route.queries[i].reader!!.fromBinary(source)
-                    true
-                } else {
-                    params[it] = route.typedSegments[it].reader!!.fromBinary(source)
-                    true
+            if(source.readableBytes() > 0) {
+                source.readObject {
+                    if (it > paramCount + queries.size) {
+                        false
+                    } else if (it >= paramCount) {
+                        val i = it - paramCount
+                        queries[i] = route.queries[i].reader!!.fromBinary(source)
+                        true
+                    } else {
+                        params[it] = route.typedSegments[it].reader!!.fromBinary(source)
+                        true
+                    }
                 }
             }
 
