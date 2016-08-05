@@ -16,6 +16,7 @@ val reconnectTimeout = 10000L
 /** Sends received metrics to a metrics server. */
 class ServerSender(
     context: ServerContext,
+    val serverName: String,
     val host: String,
     val port: Int = 1338,
     sendInterval: Int = 60 * 1000
@@ -52,7 +53,7 @@ class ServerSender(
             iterator.remove()
         }
 
-        client.serverMetric(metrics) { r, e ->
+        client.serverMetric(metrics, serverName) { r, e ->
             // If the sending failed we discard the events,
             // as queueing too many metrics could cause spikes in server latency.
         }

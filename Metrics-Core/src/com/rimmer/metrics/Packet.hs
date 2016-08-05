@@ -4,11 +4,14 @@ data MetricPacket
   | ProfilePacket Profile
   | ErrorPacket Error
 
+data MetricUnit = TimeUnit | ByteUnit | CountUnit
+
 type Stat = (
     location: ?String,
     category: String,
     time: Date,
     sampleCount: Int,
+    unit: MetricUnit,
     total: Long,
     min: Long,
     max: Long,

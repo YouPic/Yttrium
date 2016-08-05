@@ -13,15 +13,15 @@ import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.metrics.server.generated.type.*
 
 inline fun Router.serverApi(
-    crossinline metric: RouteContext.(packets: List<MetricPacket>, ip: IPAddress) -> Task<Unit>
+    crossinline metric: RouteContext.(packets: List<MetricPacket>, serverName: String, ip: IPAddress) -> Task<Unit>
 ) {
     addRoute(
         HttpMethod.POST, 0, 
         emptyList<RouteProperty>(), 
         listOf(PathSegment("metric", null, null)), 
-        listOf(BuilderQuery("packets", false, null, "", List::class.java, arrayReader<MetricPacket>(MetricPacket.reader)), BuilderQuery("ip", false, null, "", IPAddress::class.java, null)), 
+        listOf(BuilderQuery("packets", false, null, "", List::class.java, arrayReader<MetricPacket>(MetricPacket.reader)), BuilderQuery("serverName", false, null, "", String::class.java, stringReader), BuilderQuery("ip", false, null, "", IPAddress::class.java, null)), 
         listOf(pluginMap["AddressPlugin"]!!), 
         null, 
-        { metric(it[0] as List<MetricPacket>, it[1] as IPAddress) }
+        { metric(it[0] as List<MetricPacket>, it[1] as String, it[2] as IPAddress) }
     )
 }

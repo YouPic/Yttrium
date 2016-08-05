@@ -63,6 +63,9 @@ val startFieldHash = "start".hashCode()
 val countFieldName = "count".toByteArray()
 val countFieldHash = "count".hashCode()
 
+val unitFieldName = "unit".toByteArray()
+val unitFieldHash = "unit".hashCode()
+
 val medianFieldName = "median".toByteArray()
 val medianFieldHash = "median".hashCode()
 

@@ -60,6 +60,7 @@ data class StatPacket(
     val category: String,
     val time: DateTime,
     val sampleCount: Int,
+    val unit: MetricUnit,
     val total: Long,
     val min: Long,
     val max: Long,
@@ -81,6 +82,8 @@ data class StatPacket(
         writer.value(time)
         writer.field(sampleCountFieldName)
         writer.value(sampleCount)
+        writer.field(unitFieldName)
+        unit.encodeJson(writer)
         writer.field(totalFieldName)
         writer.value(total)
         writer.field(minFieldName)
@@ -109,13 +112,14 @@ data class StatPacket(
         buffer.writeString(category)
         buffer.writeVarLong(time.millis)
         buffer.writeVarInt(sampleCount)
+        unit.encodeBinary(buffer)
         buffer.writeVarLong(total)
         buffer.writeVarLong(min)
         buffer.writeVarLong(max)
         buffer.writeVarLong(median)
-        buffer.writeVarLong(average95)
-        var header10 = 1
+        var header10 = 9
         buffer.writeVarInt(header10)
+        buffer.writeVarLong(average95)
         buffer.writeVarLong(average99)
     }
 
@@ -129,6 +133,7 @@ data class StatPacket(
             var category: String? = null
             var time: DateTime? = null
             var sampleCount: Int = 0
+            var unit: MetricUnit? = null
             var total: Long = 0L
             var min: Long = 0L
             var max: Long = 0L
@@ -155,26 +160,30 @@ data class StatPacket(
                         true
                     }
                     5 -> {
-                        total = buffer.readVarLong()
+                        unit = MetricUnit.fromBinary(buffer)
                         true
                     }
                     6 -> {
-                        min = buffer.readVarLong()
+                        total = buffer.readVarLong()
                         true
                     }
                     7 -> {
-                        max = buffer.readVarLong()
+                        min = buffer.readVarLong()
                         true
                     }
                     8 -> {
-                        median = buffer.readVarLong()
+                        max = buffer.readVarLong()
                         true
                     }
                     9 -> {
-                        average95 = buffer.readVarLong()
+                        median = buffer.readVarLong()
                         true
                     }
                     10 -> {
+                        average95 = buffer.readVarLong()
+                        true
+                    }
+                    11 -> {
                         average99 = buffer.readVarLong()
                         true
                     }
@@ -182,10 +191,10 @@ data class StatPacket(
                 }
             }
 
-            if(category == null || time == null) {
+            if(category == null || time == null || unit == null) {
                 throw InvalidStateException("StatPacket instance is missing required fields")
             }
-            return StatPacket(location, category!!, time!!, sampleCount, total, min, max, median, average95, average99)
+            return StatPacket(location, category!!, time!!, sampleCount, unit!!, total, min, max, median, average95, average99)
         }
 
         fun fromJson(token: JsonToken): StatPacket {
@@ -193,6 +202,7 @@ data class StatPacket(
             var category: String? = null
             var time: DateTime? = null
             var sampleCount: Int = 0
+            var unit: MetricUnit? = null
             var total: Long = 0L
             var min: Long = 0L
             var max: Long = 0L
@@ -222,6 +232,9 @@ data class StatPacket(
                         sampleCountFieldHash -> {
                             token.expect(JsonToken.Type.NumberLit)
                             sampleCount = token.numberPayload.toInt()
+                        }
+                        unitFieldHash -> {
+                            unit = MetricUnit.fromJson(token)
                         }
                         totalFieldHash -> {
                             token.expect(JsonToken.Type.NumberLit)
@@ -253,10 +266,10 @@ data class StatPacket(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            if(category == null || time == null) {
+            if(category == null || time == null || unit == null) {
                 throw InvalidStateException("StatPacket instance is missing required fields")
             }
-            return StatPacket(location, category, time, sampleCount, total, min, max, median, average95, average99)
+            return StatPacket(location, category, time, sampleCount, unit, total, min, max, median, average95, average99)
         }
     }
 }

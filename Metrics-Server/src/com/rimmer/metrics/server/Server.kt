@@ -22,12 +22,12 @@ import com.rimmer.yttrium.server.binary.listenBinary
 fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
     val router = Router(listOf(AddressPlugin()) as List<Plugin<in Any>>)
     router.serverApi(
-        metric = { it, ip ->
+        metric = { it, name, ip ->
             it.forEach {
                 when(it) {
-                    is StatPacket -> store.onStat(it, ip.ip)
-                    is ProfilePacket -> store.onProfile(it, ip.ip)
-                    is ErrorPacket -> store.onError(it, ip.ip)
+                    is StatPacket -> store.onStat(it, name, ip.ip)
+                    is ProfilePacket -> store.onProfile(it, name, ip.ip)
+                    is ErrorPacket -> store.onError(it, name, ip.ip)
                 }
             }
             finish()

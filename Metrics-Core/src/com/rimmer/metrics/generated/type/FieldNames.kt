@@ -30,6 +30,9 @@ val fatalFieldHash = "fatal".hashCode()
 val sampleCountFieldName = "sampleCount".toByteArray()
 val sampleCountFieldHash = "sampleCount".hashCode()
 
+val unitFieldName = "unit".toByteArray()
+val unitFieldHash = "unit".hashCode()
+
 val totalFieldName = "total".toByteArray()
 val totalFieldHash = "total".hashCode()
 

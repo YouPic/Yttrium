@@ -58,7 +58,7 @@ class Metric {
     )
 }
 
-class CategoryMetric(val category: String) {
+class CategoryMetric(val category: String, val unit: MetricUnit) {
     val metric = Metric()
     val paths = HashMap<String, Metric>()
 }
@@ -121,7 +121,7 @@ class MetricStore {
         return list.map {
             TimeMetricResponse(it.time, it.metric.toResponse(), it.servers.mapValues {
                 ServerMetricResponse(it.value.metric.toResponse(), it.value.categories.mapValues {
-                    CategoryMetricResponse(it.value.metric.toResponse(), it.value.paths.mapValues {
+                    CategoryMetricResponse(it.value.metric.toResponse(), it.value.unit, it.value.paths.mapValues {
                         it.value.toResponse()
                     })
                 })
@@ -170,7 +170,7 @@ class MetricStore {
         } }
     }
 
-    @Synchronized fun onStat(packet: StatPacket, remote: String) {
+    @Synchronized fun onStat(packet: StatPacket, remoteName: String, remote: String) {
         println("Received stat packet with ${packet.sampleCount} samples.")
 
         val key = packet.time.millis / 60000
@@ -185,8 +185,9 @@ class MetricStore {
             p
         }
 
-        val serverPoint = timePoint.servers.getOrAdd(remote) { ServerMetric(remote) }
-        val categoryPoint = serverPoint.categories.getOrAdd(packet.category) { CategoryMetric(packet.category) }
+        val name = remoteName(remoteName, remote)
+        val serverPoint = timePoint.servers.getOrAdd(name) { ServerMetric(name) }
+        val categoryPoint = serverPoint.categories.getOrAdd(packet.category) { CategoryMetric(packet.category, packet.unit) }
         val pathPoint = packet.location?.let { categoryPoint.paths.getOrAdd(it) { Metric() } }
 
         timePoint.metric.update(packet)
@@ -195,7 +196,7 @@ class MetricStore {
         pathPoint?.update(packet)
     }
 
-    @Synchronized fun onProfile(packet: ProfilePacket, remote: String) {
+    @Synchronized fun onProfile(packet: ProfilePacket, remoteName: String, remote: String) {
         println("Received profile packet with ${packet.events.size} events.")
 
         // Remove the profile builder from any old in-flight profiles.
@@ -213,7 +214,8 @@ class MetricStore {
             p
         }
 
-        val serverProfile = timeProfile.servers.getOrAdd(remote) { HashMap() }
+        val name = remoteName(remoteName, remote)
+        val serverProfile = timeProfile.servers.getOrAdd(name) { HashMap() }
         val categoryProfile = serverProfile.getOrAdd(packet.category) { CategoryProfile(packet.category) }
         val pathProfile = packet.location?.let { categoryProfile.paths.getOrAdd(it) { Profile() } }
         val profile = pathProfile ?: categoryProfile.profile
@@ -230,17 +232,20 @@ class MetricStore {
         profile.max = profile.profileBuilder.last()
     }
 
-    @Synchronized fun onError(packet: ErrorPacket, remote: String) {
+    @Synchronized fun onError(packet: ErrorPacket, remoteName: String, remote: String) {
         println("Received error packet.")
 
+        val name = remoteName(remoteName, remote)
         val category = errorMap.getOrPut(packet.category) { HashMap() }
         val errorClass = category.getOrPut(packet.cause) { ErrorClass(packet.cause, packet.trace, packet.fatal) }
         errorClass.count++
         errorClass.lastOccurrence = packet.time
-        errorClass.servers.getOrAdd(remote) {
+        errorClass.servers.getOrAdd(name) {
             ArrayList()
         }.add(ErrorInstance(packet.time, packet.trace, packet.location))
     }
+
+    private fun remoteName(name: String, remote: String) = "$name [$remote]"
 }
 
 fun isOldPoint(time: DateTime, p: TimeSlice) = time.millis - p.time.millis > 60000

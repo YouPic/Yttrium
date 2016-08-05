@@ -95,8 +95,8 @@ data class ServerMetric(
                                     break
                                 } else if(token.type == JsonToken.Type.FieldName) {
                                     val categories_k = token.stringPayload
-                                    val
-                                    categories_v = CategoryMetric.fromJson(token)
+                                    
+                                    val categories_v = CategoryMetric.fromJson(token)
                                     categories.put(categories_k, categories_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")

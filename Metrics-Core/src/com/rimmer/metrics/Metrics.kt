@@ -58,6 +58,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
     private val statNames = arrayOfNulls<String>(maxStats)
     private val statTypes = ByteArray(maxStats)
     private val statScopes = ByteArray(maxStats)
+    private val statUnits = Array(maxStats) { MetricUnit.CountUnit }
     private val statsValues = AtomicLongArray(maxStats)
     private var statCount = 0
     @Volatile private var statsSent = 0L
@@ -67,7 +68,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
      * Registers a new statistic with the provided accumulator type.
      * @return An id that can be used for later calls concerning this statistic.
      */
-    @Synchronized fun registerStat(category: String, type: Accumulator, scope: Scope): Int {
+    @Synchronized fun registerStat(category: String, type: Accumulator, scope: Scope, unit: MetricUnit = MetricUnit.CountUnit): Int {
         val currentIndex = statNames.indexOf(category)
         if(currentIndex < 0) {
             val index = statCount++
@@ -76,6 +77,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
             statNames[index] = category
             statTypes[index] = type.ordinal.toByte()
             statScopes[index] = scope.ordinal.toByte()
+            statUnits[index] = unit
             return index
         } else if(statTypes[currentIndex] !== type.ordinal.toByte()) {
             throw IllegalStateException("Statistic $category already exists under a different type.")
@@ -281,7 +283,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
 
                 // Send the timing intervals for calculating statistics.
                 sender(StatPacket(
-                    min.path, min.category, date, calls.size, totalTime,
+                    min.path, min.category, date, calls.size, MetricUnit.TimeUnit, totalTime,
                     min.endTime - min.startTime,
                     max.endTime - max.startTime,
                     median.endTime - median.startTime,
@@ -315,7 +317,7 @@ class Metrics(maxStats: Int = 32): MetricsWriter {
                 } else {
                     statsValues[i]
                 }
-                sender(StatPacket(null, category, time, 1, value, value, value, value, value, value))
+                sender(StatPacket(null, category, time, 1, statUnits[i], value, value, value, value, value, value))
             }
         }
     }

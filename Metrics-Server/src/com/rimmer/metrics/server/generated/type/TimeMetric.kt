@@ -109,8 +109,8 @@ data class TimeMetric(
                                     break
                                 } else if(token.type == JsonToken.Type.FieldName) {
                                     val servers_k = token.stringPayload
-                                    val
-                                    servers_v = ServerMetric.fromJson(token)
+                                    
+                                    val servers_v = ServerMetric.fromJson(token)
                                     servers.put(servers_k, servers_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")

@@ -11,6 +11,7 @@ data Metric where
 
 data CategoryMetric where
    metric: Metric
+   unit: MetricUnit
    paths: {String -> Metric}
 
 data ServerMetric where

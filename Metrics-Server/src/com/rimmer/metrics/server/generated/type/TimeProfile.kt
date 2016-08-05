@@ -122,8 +122,8 @@ data class TimeProfile(
                                             break
                                         } else if(token.type == JsonToken.Type.FieldName) {
                                             val servers_v_k = token.stringPayload
-                                            val
-                                            servers_v_v = CategoryProfile.fromJson(token)
+                                            
+                                            val servers_v_v = CategoryProfile.fromJson(token)
                                             servers_v.put(servers_v_k, servers_v_v)
                                         } else {
                                             throw InvalidStateException("Invalid json: expected field or object end")

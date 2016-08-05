@@ -11,23 +11,24 @@ import com.rimmer.metrics.generated.type.*
 import com.rimmer.yttrium.server.binary.BinaryClient
 import com.rimmer.metrics.server.generated.type.*
 
-fun BinaryClient.serverMetric(packets: List<MetricPacket>, callback: (Unit?, Throwable?) -> Unit) {
+fun BinaryClient.serverMetric(packets: List<MetricPacket>, serverName: String, callback: (Unit?, Throwable?) -> Unit) {
     call(
         -1500814561, {
-            val header0 = 7
+            val header0 = 39
             this.writeVarInt(header0)
             this.writeVarLong((packets.size.toLong() shl 3) or 5)
             for(o in packets) {
                 o.encodeBinary(this)
             }
+            this.writeString(serverName)
         }, {
         }, callback
     )
 }
 
-fun BinaryClient.serverMetric(packets: List<MetricPacket>): Task<Unit> {
+fun BinaryClient.serverMetric(packets: List<MetricPacket>, serverName: String): Task<Unit> {
     val resultTask = Task<Unit>()
-    serverMetric(packets, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
+    serverMetric(packets, serverName, { r, e -> if(e === null) resultTask.finish(r!!) else resultTask.fail(e) })
     return resultTask
 }
 

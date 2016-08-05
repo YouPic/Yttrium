@@ -95,8 +95,8 @@ data class CategoryProfile(
                                     break
                                 } else if(token.type == JsonToken.Type.FieldName) {
                                     val paths_k = token.stringPayload
-                                    val
-                                    paths_v = ProfileStat.fromJson(token)
+                                    
+                                    val paths_v = ProfileStat.fromJson(token)
                                     paths.put(paths_k, paths_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")
