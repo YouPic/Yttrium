@@ -7,7 +7,7 @@ import com.rimmer.yttrium.*
 import com.rimmer.yttrium.serialize.*
 
 enum class MetricUnit: Writable {
-    TimeUnit, ByteUnit, CountUnit;
+    TimeUnit, ByteUnit, CountUnit, FractionUnit;
 
     override fun encodeBinary(buffer: ByteBuf) {
         buffer.writeByte(ordinal)

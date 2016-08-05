@@ -4,7 +4,10 @@ data MetricPacket
   | ProfilePacket Profile
   | ErrorPacket Error
 
-data MetricUnit = TimeUnit | ByteUnit | CountUnit
+-- Determines how the metric data will be shown.
+-- Times are interpreted as nanoseconds.
+-- Fractions are interpreted as x/1000000.
+data MetricUnit = TimeUnit | ByteUnit | CountUnit | FractionUnit
 
 type Stat = (
     location: ?String,

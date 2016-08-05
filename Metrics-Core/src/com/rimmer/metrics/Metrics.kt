@@ -27,7 +27,7 @@ interface MetricsWriter {
  * Handles metric events on a client.
  * All public functions are thread-safe.
  */
-class Metrics(maxStats: Int = 32): MetricsWriter {
+class Metrics(maxStats: Int = 64): MetricsWriter {
     enum class Accumulator { set, count, min, max }
     enum class Scope { local, global }
 
