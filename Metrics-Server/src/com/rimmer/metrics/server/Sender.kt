@@ -56,6 +56,7 @@ class ServerSender(
         client.serverMetric(metrics, serverName) { r, e ->
             // If the sending failed we discard the events,
             // as queueing too many metrics could cause spikes in server latency.
+            if(e !== null) println("Could not send event batch: $e")
         }
     }
 

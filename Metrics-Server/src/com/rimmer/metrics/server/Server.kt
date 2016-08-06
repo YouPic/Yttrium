@@ -5,12 +5,12 @@ import com.rimmer.metrics.generated.type.ProfilePacket
 import com.rimmer.metrics.generated.type.StatPacket
 import com.rimmer.metrics.server.generated.api.clientApi
 import com.rimmer.metrics.server.generated.api.serverApi
-import com.rimmer.yttrium.UnauthorizedException
-import com.rimmer.yttrium.finished
+import com.rimmer.yttrium.*
 import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.RouteModifier
 import com.rimmer.yttrium.router.RouteProperty
 import com.rimmer.yttrium.router.Router
+import com.rimmer.yttrium.router.listener.RouteListener
 import com.rimmer.yttrium.router.plugin.AddressPlugin
 import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.yttrium.serialize.stringReader
@@ -34,7 +34,7 @@ fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
         }
     )
 
-    listenBinary(context, port, null, BinaryRouter(router))
+    listenBinary(context, port, null, BinaryRouter(router, ErrorListener()))
 }
 
 /** Runs a server that listens for client requests and sends metrics data. */
@@ -53,7 +53,7 @@ fun clientServer(context: ServerContext, store: MetricStore, port: Int, password
         }
     )
 
-    listenBinary(context, port, null, BinaryRouter(router))
+    listenBinary(context, port, null, BinaryRouter(router, ErrorListener()))
 }
 
 class PasswordPlugin(val password: String): Plugin<Int> {
@@ -66,5 +66,16 @@ class PasswordPlugin(val password: String): Plugin<Int> {
     override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {
         if((route.queryParameters[context] as String) != password) f(UnauthorizedException())
         else f(null)
+    }
+}
+
+class ErrorListener: RouteListener {
+    override fun onFail(route: RouteContext, reason: Throwable?, data: Any?) {
+        println("Route ${route.route.name} failed with $reason")
+        if(!(reason is InvalidStateException ||
+            reason is UnauthorizedException ||
+            reason is NotFoundException ||
+            (reason is HttpException && reason.errorCode == 429)
+        )) reason?.printStackTrace()
     }
 }
