@@ -22,7 +22,7 @@ class ServerSender(
     sendInterval: Int = 60 * 1000
 ): (MetricPacket) -> Unit {
     // Run the sender on a single thread to prevent internal synchronization.
-    val eventLoop: EventLoop = context.acceptorGroup.next()
+    val eventLoop: EventLoop = context.handlerGroup.next()
     val queue = ConcurrentLinkedQueue<MetricPacket>()
 
     var client: BinaryClient? = null

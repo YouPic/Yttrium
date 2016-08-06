@@ -7,6 +7,6 @@ import io.netty.channel.EventLoop
  * This allows the function to get state needed for connection pools, etc.
  * @param eventLoop The event loop we are currently in.
  * This facilitates the creation of thread-local connection pools without synchronization.
- * @param id A generic context id that can be used to identify the source of a function call.
+ * @param listenerData A reference that can be used by a listener to store data.
  */
-open class Context(val eventLoop: EventLoop, val id: Long)
+open class Context(val eventLoop: EventLoop, val listenerData: Any?)

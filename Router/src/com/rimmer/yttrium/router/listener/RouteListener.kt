@@ -13,19 +13,21 @@ interface RouteListener {
      * This is called whenever a route call starts.
      * @return A listener id that will be sent to any followup calls for this route.
      */
-    fun onStart(eventLoop: EventLoop, route: Route): Long
+    fun onStart(eventLoop: EventLoop, route: Route): Any?
 
     /**
      * This is called whenever a route call succeeds.
      * @param route The context for this route, including the call id returned by onStart.
      * @param result The returned result of the route.
+     * @param data The data that was returned by onStart.
      */
-    fun onSucceed(route: RouteContext, result: Any?)
+    fun onSucceed(route: RouteContext, result: Any?, data: Any?)
 
     /**
      * This is called whenever a route call fails.
      * @param route The context for this route, including the call id returned by onStart.
      * @param reason The reason this call failed, if any.
+     * @param data The data that was returned by onStart.
      */
-    fun onFail(route: RouteContext, reason: Throwable?)
+    fun onFail(route: RouteContext, reason: Throwable?, data: Any?)
 }

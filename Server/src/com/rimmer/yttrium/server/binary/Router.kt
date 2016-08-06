@@ -39,7 +39,7 @@ class BinaryRouter(
         }
 
         val eventLoop = context.channel().eventLoop()
-        val callId = listener?.onStart(eventLoop, route) ?: 0
+        val callData = listener?.onStart(eventLoop, route)
         val params = arrayOfNulls<Any>(route.typedSegments.size)
         val paramCount = params.size
         val queries = arrayOfNulls<Any>(route.queries.size)
@@ -68,40 +68,41 @@ class BinaryRouter(
 
             // Create a secondary listener that writes responses to the caller before forwarding to the original one.
             val listener = object: RouteListener {
-                override fun onStart(eventLoop: EventLoop, route: Route) = 0L
-                override fun onSucceed(route: RouteContext, result: Any?) {
+                override fun onStart(eventLoop: EventLoop, route: Route) = null
+                override fun onSucceed(route: RouteContext, result: Any?, data: Any?) {
                     val writerIndex = target.writerIndex()
                     try {
                         target.writeByte(ResponseCode.Success.ordinal)
                         writeBinary(result, writer, target)
                         f()
-                        listener?.onSucceed(route, result)
+                        listener?.onSucceed(route, result, route.listenerData)
                     } catch(e: Throwable) {
                         target.writerIndex(writerIndex)
                         mapError(e, target, f)
-                        listener?.onFail(route, e)
+                        listener?.onFail(route, e, route.listenerData)
                     }
                 }
-                override fun onFail(route: RouteContext, reason: Throwable?) {
+                override fun onFail(route: RouteContext, reason: Throwable?, data: Any?) {
                     mapError(reason, target, f)
-                    listener?.onFail(route, reason)
+                    listener?.onFail(route, reason, route.listenerData)
                 }
             }
 
             // Run the route handler.
-            val routeContext = RouteContext(context, remote, eventLoop, route, params, queries, callId)
+            val routeContext = RouteContext(context, remote, eventLoop, route, params, queries, callData)
             try {
                 route.handler(routeContext, listener)
             } catch(e: Throwable) {
                 mapError(e, target, f)
-                this.listener?.onFail(routeContext, e)
+                this.listener?.onFail(routeContext, e, callData)
             }
         } catch(e: Throwable) {
             val error = convertDecodeError(e)
             mapError(error, target, f)
 
             // We don't have the call parameters here, so we just send a route context without them.
-            listener?.onFail(RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callId), error)
+            val routeContext = RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callData)
+            listener?.onFail(routeContext, e, callData)
         }
     }
 

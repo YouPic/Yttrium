@@ -14,13 +14,13 @@ interface MetricsWriter {
      * Starts a new profiler event within the current call.
      * @return An event index to send to endQuery.
      */
-    fun startEvent(call: Int, type: String, description: String): Int
+    fun startEvent(call: Any?, type: String, description: String): Int
 
     /** Indicates that the provided event id has finished. */
-    fun endEvent(call: Int, id: Int)
+    fun endEvent(call: Any?, id: Int)
 
     /** Adds a completed event, including the elapsed time. */
-    fun onEvent(call: Int, type: String, description: String, elapsedNanos: Long)
+    fun onEvent(call: Any?, type: String, description: String, elapsedNanos: Long)
 }
 
 /**
@@ -31,29 +31,32 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
     enum class Accumulator { set, count, min, max }
     enum class Scope { local, global }
 
-    class Call(val path: String, val category: String, val startDate: DateTime, val startTime: Long) {
+    class Call(
+        val path: Path, val category: String,
+        val startDate: DateTime, val startTime: Long,
+        val nextData: Any?
+    ) {
         val events = ArrayList<Event>()
         var endTime = 0L
         var failed = false
-        var error = false
-        var failReason = ""
-        var failTrace = ""
     }
 
-    class CallData {
-        val paths = HashMap<String, Path>()
-        val calls = ArrayList<Call?>()
-        var nextCall = 0
+    class Error(
+        val start: DateTime, val path: Path, val description: String,
+        val reason: String, val trace: String, val fatal: Boolean
+    ) {
+        var count = 1
     }
 
-    inner class Path {
+    class Path(val path: String, val category: String) {
         var lastSend = 0L
-        var counter = 0
+        var skipCounter = 0
         var calls = ArrayList<Call>()
+        val errors = ArrayList<Error>()
     }
 
     var sender: ((MetricPacket) -> Unit)? = null
-    private val callThreads = ThreadLocal<CallData>()
+    private val callThreads = ThreadLocal<HashMap<String, Path>>()
 
     private val statNames = arrayOfNulls<String>(maxStats)
     private val statTypes = ByteArray(maxStats)
@@ -121,51 +124,45 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
     }
 
     /** Indicates the start of a new action. All timed actions performed from this thread are added to the action. */
-    fun start(path: String, category: String): Int {
+    fun start(path: String, category: String, nextData: Any?): Any? {
         val startTime = System.nanoTime()
         val startDate = DateTime.now()
-        val call = Call(path, category, startDate, startTime)
-        val thread = callThreads.getOrSet { CallData() }
+        val thread = callThreads.getOrSet { HashMap() }
+        val pathData = thread.getOrAdd(path) { Path(path, category) }
+        val calls = pathData.calls
+        val count = pathData.calls.size
 
-        val i = thread.nextCall
-        if(i >= thread.calls.size) {
-            thread.calls.add(call)
-            thread.nextCall++
+        if(count < 20) {
+            val call = Call(pathData, category, startDate, startTime, nextData)
+            calls.add(call)
+            return call
         } else {
-            thread.calls[i] = call
-            val next = thread.calls.indexOfFirst { it == null }
-            thread.nextCall = if(next == -1) thread.calls.size else next
+            val stride = if(count < 50) 2 else if(count < 100) 4 else if(count < 1000) 10 else 100
+            if(pathData.skipCounter == 0) {
+                val call = Call(pathData, category, startDate, startTime, nextData)
+                pathData.calls.add(call)
+                return call
+            }
+            pathData.skipCounter++
+            if(pathData.skipCounter >= stride) {
+                pathData.skipCounter = 0
+            }
         }
-        return i
+
+        // If we have enough metrics already, we just return the path.
+        // This allows us to log errors without allocating a lot of data.
+        return if(nextData === null) pathData else pathData to nextData
     }
 
     /** Indicates that the current action has completed. It is added to the metrics. */
-    fun finish(callId: Int) {
-        val time = System.nanoTime()
-        val call = getCall(callId) ?: return
-        val thread = callThreads.get() ?: return
+    fun finish(call: Any?) {
+        if(call !is Call) return
 
+        val path = call.path
+        val time = System.nanoTime()
         call.endTime = time
 
-        var path = thread.paths[call.path]
-        if(path === null) {
-            path = Path()
-            thread.paths.put(call.path, path)
-        }
-
-        val count = path.calls.size
-        if(count < 20) {
-            path.calls.add(call)
-        } else {
-            val stride = if(count < 100) 5 else if(count < 1000) 20 else 1000
-            if(path.counter == 0) {
-                path.calls.add(call)
-            }
-            path.counter++
-            if(path.counter > stride) path.counter = 0
-        }
-
-        if((time - path.lastSend > 60000000000L) || (call.error && time - path.lastSend > 10000000000L)) {
+        if((time - path.lastSend > 60000000000L) || (call.failed && time - path.lastSend > 10000000000L)) {
             sendMetrics(path)
 
             val remaining = ArrayList<Call>()
@@ -173,26 +170,37 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
             path.calls = remaining
             path.lastSend = time
         }
-
-        removeCall(callId)
     }
 
     /** Discards the current action without adding to the metrics, for example if the call was forwarded. */
-    fun discard(call: Int) {
-        removeCall(call)
+    fun discard(call: Any?) {
+        if(call is Call) {
+            call.endTime = System.nanoTime()
+            call.failed = true
+        }
     }
 
     /**
-     * Indicates that the current call did not complete correctly.
+     * Indicates that the provided call did not complete correctly.
      * Incorrect calls are not used in the metrics.
      * @param wasError If set, the failure is reported in the metrics as an internal server error.
      */
-    fun fail(call: Int, wasError: Boolean, reason: String) {
-        getCall(call)?.run {
-            failed = true
-            error = wasError
-            failReason = reason
-            finish(call)
+    fun failCall(call: Call, wasError: Boolean, reason: String, trace: String) {
+        if(wasError) {
+            addError(call.path, call.startDate, reason, "", true, trace)
+        }
+
+        call.failed = true
+        finish(call)
+    }
+
+    /**
+     * Indicates that the provided path failed in an unknown call.
+     * @param wasError If set, the failure is reported in the metrics as an internal server error.
+     */
+    fun failPath(path: Path, wasError: Boolean, reason: String, trace: String) {
+        if(wasError) {
+            addError(path, DateTime.now(), reason, "", true, trace)
         }
     }
 
@@ -201,32 +209,38 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
      * but that the error did not cause the path to fail.
      * Most of the time this means that the resource state is correct but a side-effect of the call failed.
      */
-    fun error(call: Int, category: String, reason: String, description: String = "") {
-        getCall(call)?.run {
-            logError(category, path, reason, description, "", false)
+    fun error(call: Any, category: String, reason: String, description: String = "") {
+        if(call is Call) {
+            addError(call.path, call.startDate, reason, description, false, "")
+        } else if(call is Path) {
+            addError(call, DateTime.now(), reason, description, false, "")
+        } else if(call is Pair<*, *> && call.first is Path) {
+            addError(call.first, DateTime.now(), reason, description, false, "")
+        } else {
+            logError(category, "", reason, description, "", false)
         }
     }
 
-    override fun startEvent(call: Int, type: String, description: String): Int {
+    override fun startEvent(call: Any?, type: String, description: String): Int {
+        if(call !is Call) return -1
+
         val startTime = System.nanoTime()
-        return getCall(call)?.run {
-            events.add(Event(type, description, startTime, startTime))
-            events.size - 1
-        } ?: 0
+        call.events.add(Event(type, description, startTime, startTime))
+        return call.events.size - 1
     }
 
-    override fun endEvent(call: Int, id: Int) {
-        getCall(call)?.run {
-            val event = events[id]
-            events[id] = event.copy(endTime = System.nanoTime())
-        }
+    override fun endEvent(call: Any?, id: Int) {
+        if(call !is Call || id < 0) return
+
+        val event = call.events[id]
+        call.events[id] = event.copy(endTime = System.nanoTime())
     }
 
-    override fun onEvent(call: Int, type: String, description: String, elapsedNanos: Long) {
-        getCall(call)?.run {
-            val endTime = System.nanoTime()
-            events.add(Event(type, description, endTime - elapsedNanos, endTime))
-        }
+    override fun onEvent(call: Any?, type: String, description: String, elapsedNanos: Long) {
+        if(call !is Call) return
+
+        val endTime = System.nanoTime()
+        call.events.add(Event(type, description, endTime - elapsedNanos, endTime))
     }
 
     private fun sendMetrics(path: Path) {
@@ -235,27 +249,17 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
             sender?.let { sender ->
                 // Filter out any failed requests. If it was an internal failure we log it.
                 val calls = ArrayList<Call>(path.calls.size)
-
-                class Error(val start: DateTime, val path: String, val category: String, val reason: String, val trace: String) {
-                    var count = 0
-                }
-                val errors = HashMap<String, Error>()
-
                 path.calls.filterTo(calls) {
-                    if(it.error) {
-                        // Avoid sending many errors of the same kind.
-                        errors.getOrAdd(it.failReason) {
-                            Error(it.startDate, it.path, it.category, it.failReason, it.failTrace)
-                        }.count++
-                    }
                     !it.failed && it.endTime > 0
                 }
 
-                errors.forEach { s, error ->
+                path.errors.forEach { error ->
                     sender(ErrorPacket(
-                        error.path, error.category, true, error.start, error.reason, "", error.trace, error.count
+                        path.path, path.category, error.fatal, error.start,
+                        error.reason, error.description, error.trace, error.count
                     ))
                 }
+                path.errors.clear()
 
                 // If all calls failed, we have nothing more to do.
                 if(calls.isEmpty()) return
@@ -283,7 +287,7 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
 
                 // Send the timing intervals for calculating statistics.
                 sender(StatPacket(
-                    min.path, min.category, date, calls.size, MetricUnit.TimeUnit, totalTime,
+                    min.path.path, min.category, date, calls.size, MetricUnit.TimeUnit, totalTime,
                     min.endTime - min.startTime,
                     max.endTime - max.startTime,
                     median.endTime - median.startTime,
@@ -292,8 +296,8 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
                 ))
 
                 // Send a full profile for the median and maximum values.
-                sender(ProfilePacket(median.path, median.category, median.startDate, median.startTime, median.endTime, median.events))
-                sender(ProfilePacket(max.path, max.category, max.startDate, max.startTime, max.endTime, max.events))
+                sender(ProfilePacket(median.path.path, median.category, median.startDate, median.startTime, median.endTime, median.events))
+                sender(ProfilePacket(max.path.path, max.category, max.startDate, max.startTime, max.endTime, max.events))
             }
         } catch(e: Throwable) {
             println("Could not send metrics:")
@@ -322,19 +326,15 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
         }
     }
 
-    private fun getCall(id: Int): Call? {
-        val calls = callThreads.get()?.calls ?: return null
-        if(calls.size <= id || calls[id] == null) {
-            println("Received unknown call id $id")
-            return null
+    private fun addError(
+        path: Path, time: DateTime, reason: String,
+        description: String, fatal: Boolean, trace: String
+    ) {
+        val error = path.errors.find { it.fatal == fatal && it.reason == reason && it.description == description }
+        if(error == null) {
+            path.errors.add(Error(time, path, description, reason, trace, fatal))
         } else {
-            return calls[id]
+            error.count++
         }
-    }
-
-    private fun removeCall(id: Int) {
-        val thread = callThreads.get() ?: return
-        thread.calls[id] = null
-        thread.nextCall = id
     }
 }

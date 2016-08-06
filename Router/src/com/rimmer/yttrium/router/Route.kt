@@ -109,7 +109,7 @@ class RouteQuery(
  * @param route The route being executed.
  * @param pathParameters The path parameters that were sent to the route.
  * @param queryParameters The query parameters that were sent to the route.
- * @param id The metrics/call id for the current route.
+ * @param listenerData Data used by the first listener.
  */
 class RouteContext(
     val channel: ChannelHandlerContext,
@@ -118,8 +118,8 @@ class RouteContext(
     val route: Route,
     val pathParameters: Array<Any?>,
     val queryParameters: Array<Any?>,
-    id: Long
-): Context(eventLoop, id) {
+    listenerData: Any?
+): Context(eventLoop, listenerData) {
     fun <T> finish(v: T) = Task<T>().finish(v)
     fun finish() = Task<Unit>().finish(Unit)
 

@@ -41,7 +41,7 @@ fun SQLPool.query(context: Context, query: String, vararg params: Any?, types: L
     val task = Task<QueryResult>()
     this[context].get { c, e ->
         if(e == null) {
-            c!!.query(query, Arrays.asList(*params), types, context.id) { r, e ->
+            c!!.query(query, Arrays.asList(*params), types, context.listenerData) { r, e ->
                 c.disconnect()
                 if (e == null) {
                     task.finish(r!!)

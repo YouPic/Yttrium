@@ -15,8 +15,6 @@ import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.util.*
 
-val jsonContentType = AsciiString("application/json")
-
 class HttpRouter(
     val router: Router,
     val listener: RouteListener? = null,
@@ -52,7 +50,7 @@ class HttpRouter(
         val callId = listener?.onStart(eventLoop, route) ?: 0
         val fail = {r: RouteContext, e: Throwable? ->
             f(mapError(e))
-            listener?.onFail(r, e)
+            listener?.onFail(r, e, r.listenerData)
         }
 
         try {
@@ -65,9 +63,9 @@ class HttpRouter(
             // Parse any parameters that were provided through the request body.
             // Only parse as form-data if the whole body isn't
             val parseError = if(bodyHandler == null) {
-                if (request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
+                if(request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
                     parseJsonBody(route, request, queries)
-                } else if (route.bodyQuery == null) {
+                } else if(route.bodyQuery == null) {
                     parseBodyQuery(route, request, queries)
                 } else null
             } else {
@@ -80,18 +78,20 @@ class HttpRouter(
 
             // Call the route with a listener that sends the result back to the client.
             val listener = object: RouteListener {
-                override fun onStart(eventLoop: EventLoop, route: Route) = 0L
-                override fun onSucceed(route: RouteContext, result: Any?) {
+                override fun onStart(eventLoop: EventLoop, route: Route) = null
+                override fun onSucceed(route: RouteContext, result: Any?, data: Any?) {
                     val buffer = context.alloc().buffer()
                     try {
                         writeJson(result, route.route.writer, buffer)
                         val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer)
-                        response.headers().set(HttpHeaderNames.CONTENT_TYPE, jsonContentType)
+                        response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
                         f(response)
-                        listener?.onSucceed(route, result)
+                        listener?.onSucceed(route, result, route.listenerData)
                     } catch(e: Throwable) { fail(route, e) }
                 }
-                override fun onFail(route: RouteContext, reason: Throwable?) { fail(route, reason) }
+                override fun onFail(route: RouteContext, reason: Throwable?, data: Any?) {
+                    fail(route, reason)
+                }
             }
 
             route.handler(RouteContext(context, remote, eventLoop, route, params, queries, callId), listener)

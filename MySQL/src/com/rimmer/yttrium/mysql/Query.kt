@@ -26,7 +26,7 @@ inline fun <T> Query.value(pool: SQLPool, context: Context, crossinline format: 
 /** Fetches one result if possible, and returns it. */
 inline fun <T> Query.maybeValue(pool: SQLPool, context: Context, crossinline format: (Row) -> T): Task<T?> {
     val future = Task<T?>()
-    run(pool[context], context.id) { r, e ->
+    run(pool[context], context.listenerData) { r, e ->
         if(e == null) {
             try {
                 future.finish(r?.result?.data?.elementAtOrNull(0)?.let {format(it)})
@@ -44,7 +44,7 @@ inline fun <T> Query.maybeValue(pool: SQLPool, context: Context, crossinline for
 /** Fetches one result if possible, and runs the provided task otherwise. */
 inline fun <T> Query.valueOrElse(pool: SQLPool, context: Context, crossinline format: (Row) -> T, crossinline otherwise: () -> Task<T>): Task<T> {
     val future = Task<T>()
-    run(pool[context], context.id) { r, e ->
+    run(pool[context], context.listenerData) { r, e ->
         if(e == null) {
             val result = r!!.result
             if(result == null || result.data.size <= 0) {
@@ -103,7 +103,7 @@ inline fun <K, V> Query.asMap(pool: SQLPool, context: Context, crossinline key: 
 /** Performs an action if the query succeeded. */
 inline fun <T> Query.map(pool: SQLPool, context: Context, crossinline f: (QueryResult) -> T): Task<T> {
     val task = Task<T>()
-    run(pool[context], context.id) {r, e ->
+    run(pool[context], context.listenerData) {r, e ->
         if(e == null) {
             try {
                 task.finish(f(r!!))
@@ -120,7 +120,7 @@ inline fun <T> Query.map(pool: SQLPool, context: Context, crossinline f: (QueryR
 /** Performs a task if the query succeeded. */
 inline fun <T> Query.then(pool: SQLPool, context: Context, crossinline f: (QueryResult) -> Task<T>): Task<T> {
     val task = Task<T>()
-    run(pool[context], context.id) {r, e ->
+    run(pool[context], context.listenerData) {r, e ->
         if(e == null) {
             try {
                 val next = f(r!!)
@@ -144,7 +144,7 @@ inline fun <T> Query.then(pool: SQLPool, context: Context, crossinline f: (Query
 /** Executes this query as a task. */
 fun Query.task(pool: SQLPool, context: Context): Task<QueryResult> {
     val task = Task<QueryResult>()
-    run(pool[context], context.id) {r, e ->
+    run(pool[context], context.listenerData) {r, e ->
         if(e == null) {
             task.finish(r!!)
         } else {
@@ -157,7 +157,7 @@ fun Query.task(pool: SQLPool, context: Context): Task<QueryResult> {
 /** Executes this query as a task without returning anything. */
 fun Query.unitTask(pool: SQLPool, context: Context): Task<Unit> {
     val task = Task<Unit>()
-    run(pool[context], context.id) {r, e ->
+    run(pool[context], context.listenerData) {r, e ->
         if(e == null) {
             task.finish(Unit)
         } else {
@@ -179,7 +179,7 @@ fun parallel(pool: SQLPool, context: Context, vararg queries: Query): Task<Unit>
     val task = Task<Unit>()
 
     queries.forEach {
-        it.run(pool[context], context.id) { r, e ->
+        it.run(pool[context], context.listenerData) { r, e ->
             if(e == null) {
                 val finished = count.incrementAndGet()
                 if(finished >= total) {
