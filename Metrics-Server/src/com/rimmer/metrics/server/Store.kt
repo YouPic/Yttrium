@@ -222,7 +222,7 @@ class MetricStore {
         val duration = packet.end - packet.start
         var insertIndex = 0
         profile.profileBuilder.find {insertIndex++; (it.end - it.start) > duration}
-        profile.profileBuilder.add(insertIndex - 1, ProfileEntry(packet.start, packet.end, packet.events.map {
+        profile.profileBuilder.add(insertIndex, ProfileEntry(packet.start, packet.end, packet.events.map {
             ProfileEvent(it.type, it.description, it.startTime, it.endTime)
         }))
 
