@@ -137,14 +137,16 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
             calls.add(call)
             return call
         } else {
-            val stride = if(count < 50) 2 else if(count < 100) 4 else if(count < 1000) 10 else 100
-            if(pathData.skipCounter == 0) {
+            val stride = if(count < 50) 2 else if(count < 100) 4 else if(count < 1000) 10 else 500
+            pathData.skipCounter++
+
+            if(pathData.skipCounter <= 1) {
                 val call = Call(pathData, category, startDate, startTime, nextData)
                 pathData.calls.add(call)
                 return call
             }
-            pathData.skipCounter++
-            if(pathData.skipCounter >= stride) {
+
+            if(pathData.skipCounter > stride) {
                 pathData.skipCounter = 0
             }
         }
@@ -209,7 +211,7 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
      * but that the error did not cause the path to fail.
      * Most of the time this means that the resource state is correct but a side-effect of the call failed.
      */
-    fun error(call: Any, category: String, reason: String, description: String = "") {
+    fun error(call: Any?, category: String, reason: String, description: String = "") {
         if(call is Call) {
             addError(call.path, call.startDate, reason, description, false, "")
         } else if(call is Path) {

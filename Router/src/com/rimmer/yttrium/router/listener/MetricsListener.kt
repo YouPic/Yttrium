@@ -29,7 +29,7 @@ class MetricsListener(val metrics: Metrics, val category: String, val next: Rout
     }
 
     override fun onFail(route: RouteContext, reason: Throwable?, data: Any?) {
-        val text = reason?.message ?: ""
+        val text = reason.toString()
         val wasError = when(reason) {
             is InvalidStateException -> false
             is NotFoundException -> false
