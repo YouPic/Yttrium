@@ -9,19 +9,18 @@ data Metric where
     min: Float
     count: Int
 
-data CategoryMetric where
-   metric: Metric
-   unit: MetricUnit
-   paths: {String -> Metric}
-
 data ServerMetric where
     metric: Metric
-    categories: {String -> CategoryMetric}
+    paths: {String -> Metric}
+
+data CategoryMetric where
+    metric: Metric
+    unit: MetricUnit
+    servers: {String -> ServerMetric}
 
 data TimeMetric where
     time: Date
-    metric: Metric
-    servers: {String -> ServerMetric}
+    categories: {String -> CategoryMetric}
 
 -- Profiling data types.
 data ProfileEvent where

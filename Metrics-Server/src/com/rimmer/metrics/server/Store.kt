@@ -60,17 +60,16 @@ class Metric {
 
 class CategoryMetric(val category: String, val unit: MetricUnit) {
     val metric = Metric()
-    val paths = HashMap<String, Metric>()
+    val servers = HashMap<String, ServerMetric>()
 }
 
 class ServerMetric(val server: String) {
     val metric = Metric()
-    val categories = HashMap<String, CategoryMetric>()
+    val paths = HashMap<String, Metric>()
 }
 
 class TimeMetric(time: DateTime): TimeSlice(time) {
-    val metric = Metric()
-    val servers = HashMap<String, ServerMetric>()
+    val categories = HashMap<String, CategoryMetric>()
 }
 
 class Profile {
@@ -119,9 +118,9 @@ class MetricStore {
         println("Returning stats with ${list.size} slices.")
 
         return list.map {
-            TimeMetricResponse(it.time, it.metric.toResponse(), it.servers.mapValues {
-                ServerMetricResponse(it.value.metric.toResponse(), it.value.categories.mapValues {
-                    CategoryMetricResponse(it.value.metric.toResponse(), it.value.unit, it.value.paths.mapValues {
+            TimeMetricResponse(it.time, it.categories.mapValues {
+                CategoryMetricResponse(it.value.metric.toResponse(), it.value.unit, it.value.servers.mapValues {
+                    ServerMetricResponse(it.value.metric.toResponse(), it.value.paths.mapValues {
                         it.value.toResponse()
                     })
                 })
@@ -186,11 +185,10 @@ class MetricStore {
         }
 
         val name = remoteName(remoteName, remote)
-        val serverPoint = timePoint.servers.getOrAdd(name) { ServerMetric(name) }
-        val categoryPoint = serverPoint.categories.getOrAdd(packet.category) { CategoryMetric(packet.category, packet.unit) }
-        val pathPoint = packet.location?.let { categoryPoint.paths.getOrAdd(it) { Metric() } }
+        val categoryPoint = timePoint.categories.getOrAdd(packet.category) { CategoryMetric(packet.category, packet.unit) }
+        val serverPoint = categoryPoint.servers.getOrAdd(name) { ServerMetric(name) }
+        val pathPoint = packet.location?.let { serverPoint.paths.getOrAdd(it) { Metric() } }
 
-        timePoint.metric.update(packet)
         serverPoint.metric.update(packet)
         categoryPoint.metric.update(packet)
         pathPoint?.update(packet)

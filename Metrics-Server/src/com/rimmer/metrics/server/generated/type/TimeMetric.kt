@@ -10,18 +10,15 @@ import com.rimmer.metrics.generated.type.*
 
 data class TimeMetric(
     val time: DateTime,
-    val metric: Metric,
-    val servers: Map<String, ServerMetric>
+    val categories: Map<String, CategoryMetric>
 ): Writable {
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(timeFieldName)
         writer.value(time)
-        writer.field(metricFieldName)
-        metric.encodeJson(writer)
-        writer.field(serversFieldName)
+        writer.field(categoriesFieldName)
         writer.startObject()
-        for(kv in servers) {
+        for(kv in categories) {
             writer.field(kv.key)
             kv.value.encodeJson(writer)
         }
@@ -30,12 +27,11 @@ data class TimeMetric(
     }
 
     override fun encodeBinary(buffer: ByteBuf) {
-        val header0 = 425
+        val header0 = 49
         buffer.writeVarInt(header0)
         buffer.writeVarLong(time.millis)
-        metric.encodeBinary(buffer)
-        buffer.writeVarLong((servers.size.toLong() shl 6) or 4 or (5 shl 3))
-        for(kv in servers) {
+        buffer.writeVarLong((categories.size.toLong() shl 6) or 4 or (5 shl 3))
+        for(kv in categories) {
             buffer.writeString(kv.key)
             kv.value.encodeBinary(buffer)
         }
@@ -46,8 +42,7 @@ data class TimeMetric(
 
         fun fromBinary(buffer: ByteBuf): TimeMetric {
             var time: DateTime? = null
-            var metric: Metric? = null
-            var servers: HashMap<String, ServerMetric> = HashMap()
+            var categories: HashMap<String, CategoryMetric> = HashMap()
 
             buffer.readObject {
                 when(it) {
@@ -56,19 +51,15 @@ data class TimeMetric(
                         true
                     }
                     1 -> {
-                        metric = Metric.fromBinary(buffer)
-                        true
-                    }
-                    2 -> {
-                        val length_servers = buffer.readVarLong() ushr 6
-                        var i_servers = 0
-                        while(i_servers < length_servers) {
+                        val length_categories = buffer.readVarLong() ushr 6
+                        var i_categories = 0
+                        while(i_categories < length_categories) {
                             val
-                            servers_k = buffer.readString()
+                            categories_k = buffer.readString()
                             val
-                            servers_v = ServerMetric.fromBinary(buffer)
-                            servers.put(servers_k, servers_v)
-                            i_servers++
+                            categories_v = CategoryMetric.fromBinary(buffer)
+                            categories.put(categories_k, categories_v)
+                            i_categories++
                         }
                         true
                     }
@@ -76,16 +67,15 @@ data class TimeMetric(
                 }
             }
 
-            if(time == null || metric == null) {
+            if(time == null) {
                 throw InvalidStateException("TimeMetric instance is missing required fields")
             }
-            return TimeMetric(time!!, metric!!, servers)
+            return TimeMetric(time!!, categories)
         }
 
         fun fromJson(token: JsonToken): TimeMetric {
             var time: DateTime? = null
-            var metric: Metric? = null
-            var servers: HashMap<String, ServerMetric> = HashMap()
+            var categories: HashMap<String, CategoryMetric> = HashMap()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -98,20 +88,17 @@ data class TimeMetric(
                             token.expect(JsonToken.Type.StringLit)
                             time = DateTime.parse(token.stringPayload)
                         }
-                        metricFieldHash -> {
-                            metric = Metric.fromJson(token)
-                        }
-                        serversFieldHash -> {
+                        categoriesFieldHash -> {
                             token.expect(JsonToken.Type.StartObject)
                             while(true) {
                                 token.parse()
                                 if(token.type == JsonToken.Type.EndObject) {
                                     break
                                 } else if(token.type == JsonToken.Type.FieldName) {
-                                    val servers_k = token.stringPayload
+                                    val categories_k = token.stringPayload
                                     
-                                    val servers_v = ServerMetric.fromJson(token)
-                                    servers.put(servers_k, servers_v)
+                                    val categories_v = CategoryMetric.fromJson(token)
+                                    categories.put(categories_k, categories_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")
                                 }
@@ -123,10 +110,10 @@ data class TimeMetric(
                     throw InvalidStateException("Invalid json: expected field or object end")
                 }
             }
-            if(time == null || metric == null) {
+            if(time == null) {
                 throw InvalidStateException("TimeMetric instance is missing required fields")
             }
-            return TimeMetric(time, metric, servers)
+            return TimeMetric(time, categories)
         }
     }
 }

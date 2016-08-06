@@ -10,15 +10,15 @@ import com.rimmer.metrics.generated.type.*
 
 data class ServerMetric(
     val metric: Metric,
-    val categories: Map<String, CategoryMetric>
+    val paths: Map<String, Metric>
 ): Writable {
     override fun encodeJson(writer: JsonWriter) {
         writer.startObject()
         writer.field(metricFieldName)
         metric.encodeJson(writer)
-        writer.field(categoriesFieldName)
+        writer.field(pathsFieldName)
         writer.startObject()
-        for(kv in categories) {
+        for(kv in paths) {
             writer.field(kv.key)
             kv.value.encodeJson(writer)
         }
@@ -30,8 +30,8 @@ data class ServerMetric(
         val header0 = 53
         buffer.writeVarInt(header0)
         metric.encodeBinary(buffer)
-        buffer.writeVarLong((categories.size.toLong() shl 6) or 4 or (5 shl 3))
-        for(kv in categories) {
+        buffer.writeVarLong((paths.size.toLong() shl 6) or 4 or (5 shl 3))
+        for(kv in paths) {
             buffer.writeString(kv.key)
             kv.value.encodeBinary(buffer)
         }
@@ -42,7 +42,7 @@ data class ServerMetric(
 
         fun fromBinary(buffer: ByteBuf): ServerMetric {
             var metric: Metric? = null
-            var categories: HashMap<String, CategoryMetric> = HashMap()
+            var paths: HashMap<String, Metric> = HashMap()
 
             buffer.readObject {
                 when(it) {
@@ -51,15 +51,15 @@ data class ServerMetric(
                         true
                     }
                     1 -> {
-                        val length_categories = buffer.readVarLong() ushr 6
-                        var i_categories = 0
-                        while(i_categories < length_categories) {
+                        val length_paths = buffer.readVarLong() ushr 6
+                        var i_paths = 0
+                        while(i_paths < length_paths) {
                             val
-                            categories_k = buffer.readString()
+                            paths_k = buffer.readString()
                             val
-                            categories_v = CategoryMetric.fromBinary(buffer)
-                            categories.put(categories_k, categories_v)
-                            i_categories++
+                            paths_v = Metric.fromBinary(buffer)
+                            paths.put(paths_k, paths_v)
+                            i_paths++
                         }
                         true
                     }
@@ -70,12 +70,12 @@ data class ServerMetric(
             if(metric == null) {
                 throw InvalidStateException("ServerMetric instance is missing required fields")
             }
-            return ServerMetric(metric!!, categories)
+            return ServerMetric(metric!!, paths)
         }
 
         fun fromJson(token: JsonToken): ServerMetric {
             var metric: Metric? = null
-            var categories: HashMap<String, CategoryMetric> = HashMap()
+            var paths: HashMap<String, Metric> = HashMap()
             token.expect(JsonToken.Type.StartObject)
             
             while(true) {
@@ -87,17 +87,17 @@ data class ServerMetric(
                         metricFieldHash -> {
                             metric = Metric.fromJson(token)
                         }
-                        categoriesFieldHash -> {
+                        pathsFieldHash -> {
                             token.expect(JsonToken.Type.StartObject)
                             while(true) {
                                 token.parse()
                                 if(token.type == JsonToken.Type.EndObject) {
                                     break
                                 } else if(token.type == JsonToken.Type.FieldName) {
-                                    val categories_k = token.stringPayload
+                                    val paths_k = token.stringPayload
                                     
-                                    val categories_v = CategoryMetric.fromJson(token)
-                                    categories.put(categories_k, categories_v)
+                                    val paths_v = Metric.fromJson(token)
+                                    paths.put(paths_k, paths_v)
                                 } else {
                                     throw InvalidStateException("Invalid json: expected field or object end")
                                 }
@@ -112,7 +112,7 @@ data class ServerMetric(
             if(metric == null) {
                 throw InvalidStateException("ServerMetric instance is missing required fields")
             }
-            return ServerMetric(metric, categories)
+            return ServerMetric(metric, paths)
         }
     }
 }
