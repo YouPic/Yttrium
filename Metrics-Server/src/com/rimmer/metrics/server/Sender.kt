@@ -19,6 +19,7 @@ class ServerSender(
     val serverName: String,
     val host: String,
     val port: Int = 1338,
+    val useNative: Boolean = false,
     sendInterval: Int = 60 * 1000
 ): (MetricPacket) -> Unit {
     // Run the sender on a single thread to prevent internal synchronization.
@@ -70,7 +71,7 @@ class ServerSender(
             if(time - lastTry < reconnectTimeout) return
             lastTry = time
 
-            connectBinary(eventLoop, host, port) { c, e ->
+            connectBinary(eventLoop, host, port, useNative = useNative) { c, e ->
                 if(e == null) {
                     println("Connected to metrics server.")
                 } else {
