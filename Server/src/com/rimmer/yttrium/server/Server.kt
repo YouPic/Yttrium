@@ -5,9 +5,11 @@ import io.netty.channel.*
 import io.netty.channel.epoll.Epoll
 import io.netty.channel.epoll.EpollEventLoopGroup
 import io.netty.channel.epoll.EpollServerSocketChannel
+import io.netty.channel.epoll.EpollSocketChannel
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioServerSocketChannel
+import io.netty.channel.socket.nio.NioSocketChannel
 
 /**
  * Contains common data used through the server.
@@ -48,20 +50,25 @@ inline fun runServer(threadCount: Int = 0, useNative: Boolean = false, f: (Serve
  * The server then listens for requests using the built pipeline.
  * Note that the pipeline builder is called for each connection, and thus should cache any common data.
  */
-inline fun listen(context: ServerContext, port: Int, crossinline pipeline: ChannelPipeline.() -> Unit): ChannelFuture {
-    val channel = if(context.handlerGroup is EpollEventLoopGroup) {
+inline fun listen(
+    context: ServerContext,
+    port: Int,
+    useNative: Boolean = false,
+    crossinline pipeline: ChannelPipeline.() -> Unit
+): ChannelFuture {
+    val channelType = if(useNative && Epoll.isAvailable()) {
         EpollServerSocketChannel::class.java as Class<out ServerChannel>
     } else {
         NioServerSocketChannel::class.java
     }
-    
+
     val child = object: ChannelInitializer<SocketChannel>() {
         override fun initChannel(channel: SocketChannel) { pipeline(channel.pipeline()) }
     }
 
     return ServerBootstrap()
         .group(context.acceptorGroup, context.handlerGroup)
-        .channel(channel)
+        .channel(channelType)
         .childHandler(child)
         .bind(port).sync().channel().closeFuture()
 }

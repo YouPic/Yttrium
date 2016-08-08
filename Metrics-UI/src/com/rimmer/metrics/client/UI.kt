@@ -101,8 +101,11 @@ class MetricsUI: Application() {
         stage.title = "Metrics UI"
 
         val tabs = TabPane()
-        val mainTab = Tab("Overview", categoryList)
-        val serverTab = Tab("Servers", serverList)
+        val mainTab = Tab("Overview")
+        mainTab.content = categoryList
+
+        val serverTab = Tab("Servers")
+        serverTab.content = serverList
 
         tabs.tabs.add(mainTab)
         tabs.tabs.add(serverTab)

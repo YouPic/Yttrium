@@ -15,9 +15,10 @@ fun listenHttp(
     context: ServerContext,
     port: Int,
     cors: Boolean = false,
+    useNative: Boolean = false,
     pipeline: (ChannelPipeline.() -> Unit)? = null,
     handler: (ChannelHandlerContext, FullHttpRequest, (HttpResponse) -> Unit) -> Unit
-) = listen(context, port) {
+) = listen(context, port, useNative) {
     addLast(HttpResponseEncoder(), HttpRequestDecoder())
     addLast(HttpObjectAggregator(10 * 1024 * 1024), HttpHandler(handler, cors))
     pipeline?.invoke(this)

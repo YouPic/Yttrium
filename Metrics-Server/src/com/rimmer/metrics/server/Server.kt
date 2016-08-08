@@ -19,7 +19,7 @@ import com.rimmer.yttrium.server.binary.BinaryRouter
 import com.rimmer.yttrium.server.binary.listenBinary
 
 /** Runs a server that receives metrics and stores them in-memory. */
-fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
+fun storeServer(context: ServerContext, store: MetricStore, port: Int, useNative: Boolean = false) {
     val router = Router(listOf(AddressPlugin()) as List<Plugin<in Any>>)
     router.serverApi(
         metric = { it, name, ip ->
@@ -34,11 +34,11 @@ fun storeServer(context: ServerContext, store: MetricStore, port: Int) {
         }
     )
 
-    listenBinary(context, port, null, BinaryRouter(router, ErrorListener()))
+    listenBinary(context, port, useNative, null, BinaryRouter(router, ErrorListener()))
 }
 
 /** Runs a server that listens for client requests and sends metrics data. */
-fun clientServer(context: ServerContext, store: MetricStore, port: Int, password: String) {
+fun clientServer(context: ServerContext, store: MetricStore, port: Int, password: String, useNative: Boolean = false) {
     val router = Router(listOf(PasswordPlugin(password), AddressPlugin()) as List<Plugin<in Any>>)
 
     router.clientApi(
@@ -53,7 +53,7 @@ fun clientServer(context: ServerContext, store: MetricStore, port: Int, password
         }
     )
 
-    listenBinary(context, port, null, BinaryRouter(router, ErrorListener()))
+    listenBinary(context, port, useNative, null, BinaryRouter(router, ErrorListener()))
 }
 
 class PasswordPlugin(val password: String): Plugin<Int> {
