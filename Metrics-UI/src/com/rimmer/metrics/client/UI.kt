@@ -18,7 +18,13 @@ import javafx.scene.Scene
 import javafx.scene.chart.LineChart
 import javafx.scene.chart.NumberAxis
 import javafx.scene.chart.XYChart
+import javafx.scene.control.ListCell
 import javafx.scene.control.ListView
+import javafx.scene.control.Tab
+import javafx.scene.control.TabPane
+import javafx.scene.control.cell.ComboBoxListCell
+import javafx.scene.layout.BorderPane
+import javafx.scene.layout.VBox
 import javafx.stage.Stage
 import javafx.util.StringConverter
 import org.joda.time.DateTime
@@ -65,6 +71,10 @@ class StatGraph(val unit: MetricUnit) {
         }
         series.data.add(XYChart.Data<Number, Number>(x, y))
     }
+
+    fun name(name: String) {
+        chart.title = name
+    }
 }
 
 class Server(unit: MetricUnit) {
@@ -83,13 +93,21 @@ class MetricsUI: Application() {
     var server: BinaryClient? = null
     var lastUpdate = DateTime(0)
 
-    val categories = FXCollections.observableHashMap<String, Category>()
+    val categories = HashMap<String, Category>()
+    val categoryList = VBox()
+    val serverList = VBox()
 
     override fun start(stage: Stage) {
         stage.title = "Metrics UI"
 
-        val graphs = ListView(categories.toList())
-        val scene = Scene(graphs, 800.0, 600.0)
+        val tabs = TabPane()
+        val mainTab = Tab("Overview", categoryList)
+        val serverTab = Tab("Servers", serverList)
+
+        tabs.tabs.add(mainTab)
+        tabs.tabs.add(serverTab)
+
+        val scene = Scene(tabs, 800.0, 600.0)
 
         stage.scene = scene
         stage.show()
@@ -127,6 +145,18 @@ class MetricsUI: Application() {
         }
     }
 
+    fun addCategory(name: String, unit: MetricUnit): Category {
+        val category = Category(unit)
+        categoryList.children.add(category.overallPaths.chart)
+        return category
+    }
+
+    fun addServer(category: Category, name: String, unit: MetricUnit): Server {
+        val server = Server(unit)
+        serverList.children.add(server.paths.chart)
+        return server
+    }
+
     fun onUpdate(packet: List<TimeMetric>) {
         println("Received update: $packet")
 
@@ -138,18 +168,25 @@ class MetricsUI: Application() {
             val time = p.time.millis
             p.categories.forEach { c ->
                 val baseCategory = c.key.substringBefore('.')
-                val category = categories.getOrAdd(baseCategory) { Category(c.value.unit) }
+                val category = categories.getOrAdd(baseCategory) { addCategory(baseCategory, c.value.unit) }
 
+                category.overallPaths.name(baseCategory)
                 category.overallPaths.add("Average", time, c.value.metric.average)
                 category.overallPaths.add("Median", time, c.value.metric.median)
                 category.overallPaths.add("Max", time, c.value.metric.max)
+
+                category.overallStats.name(baseCategory)
                 category.overallStats.add(c.key.substringAfter('.'), time, c.value.metric.average)
 
                 c.value.servers.forEach { s ->
-                    val server = category.servers.getOrAdd(s.key) { Server(c.value.unit) }
+                    val server = category.servers.getOrAdd(s.key) { addServer(category, s.key, c.value.unit) }
+                    server.paths.name("${s.key} ($baseCategory)")
                     server.paths.add("Average", time, s.value.metric.average)
                     server.paths.add("Median", time, s.value.metric.median)
                     server.paths.add("Max", time, s.value.metric.max)
+
+                    server.stats.name("${s.key} ($baseCategory)")
+                    server.stats.add(c.key.substringAfter('.'), time, c.value.metric.average)
                 }
             }
         }
