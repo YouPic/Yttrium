@@ -11,7 +11,7 @@ import io.netty.handler.codec.http.*
 import io.netty.util.AsciiString
 import java.util.*
 
-class HttpPooledClient(context: ServerContext) {
+class HttpPooledClient(context: ServerContext, val useNative: Boolean = false) {
     private val pools: Map<EventLoop, HashMap<String, SingleThreadPool>>
 
     init {
@@ -91,7 +91,7 @@ class HttpPooledClient(context: ServerContext) {
 
 
         val client = pool.getOrAdd(selector) { SingleThreadPool(PoolConfiguration(4)) {
-            connectHttp(loop, domain, port, isSsl, 30000, it)
+            connectHttp(loop, domain, port, isSsl, 30000, useNative, it)
         } }
 
         val request = if(body === null) {

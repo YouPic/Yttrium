@@ -15,11 +15,12 @@ inline fun connect(
     host: String,
     port: Int,
     timeout: Int = 0,
+    useNative: Boolean = false,
     crossinline pipeline: ChannelPipeline.() -> Unit,
     crossinline onFail: (Throwable?) -> Unit
 ): ChannelFuture {
-    val channel = if(loop is EpollEventLoopGroup) {
-        EpollSocketChannel::class.java
+    val channelType = if(useNative && Epoll.isAvailable()) {
+        EpollSocketChannel::class.java as Class<out Channel>
     } else {
         NioSocketChannel::class.java
     }
@@ -28,7 +29,7 @@ inline fun connect(
         override fun initChannel(channel: SocketChannel) { pipeline(channel.pipeline()) }
     }
 
-    val b = Bootstrap().group(loop).channel(channel).handler(init)
+    val b = Bootstrap().group(loop).channel(channelType).handler(init)
     if(timeout > 0) b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, timeout)
 
     val promise = b.connect(host, port)

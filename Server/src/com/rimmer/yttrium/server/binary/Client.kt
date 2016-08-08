@@ -60,8 +60,9 @@ fun connectBinary(
     host: String,
     port: Int,
     timeout: Int = 0,
+    useNative: Boolean = false,
     onConnect: (BinaryClient?, Throwable?) -> Unit
-) = connect(loop, host, port, timeout, {
+) = connect(loop, host, port, timeout, useNative, {
     addLast(BinaryClientHandler(onConnect))
 }, {
     onConnect(null, it)

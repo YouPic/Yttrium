@@ -85,8 +85,15 @@ interface HttpClient {
     val lastRequest: Long
 }
 
-fun connectHttp(loop: EventLoopGroup, host: String, port: Int, ssl: Boolean = false, timeout: Int = 0, f: (HttpClient?, Throwable?) -> Unit) {
-    connect(loop, host, port, timeout, {
+fun connectHttp(
+    loop: EventLoopGroup,
+    host: String, port: Int,
+    ssl: Boolean = false,
+    timeout: Int = 0,
+    useNative: Boolean = false,
+    f: (HttpClient?, Throwable?) -> Unit
+) {
+    connect(loop, host, port, timeout, useNative, {
         val sslContext = if(ssl) {
             val sslContext = SslContextBuilder.forClient().trustManager(InsecureTrustManagerFactory.INSTANCE).build()
             val handler = SslHandler(sslContext.newEngine(ByteBufAllocator.DEFAULT, host, port))
