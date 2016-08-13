@@ -89,10 +89,11 @@ class SingleThreadPool(
             // If the connection timed out or is otherwise unusable, we drop it and create a new one.
             if(connection.busy || !connection.connected || (System.nanoTime() - connection.lastRequest) > config.maxIdleTime) {
                 if(config.debug) {
-                    println("Closing timed out MySQL connection.")
+                    println("Closing timed out Http connection.")
                 }
 
                 connection.connection.close()
+                connections.remove(connection)
                 connectionCount--
                 get(f)
             } else {
