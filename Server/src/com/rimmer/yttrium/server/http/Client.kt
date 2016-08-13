@@ -112,7 +112,7 @@ fun connectHttp(
     })
 }
 
-class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ssl: SslHandler?): ChannelInboundHandlerAdapter(), HttpClient {
+class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val ssl: SslHandler?): ChannelInboundHandlerAdapter(), HttpClient {
     private var context: ChannelHandlerContext? = null
     private var listener: HttpListener? = null
     private var result: HttpResult? = null
@@ -126,14 +126,16 @@ class HttpClientHandler(val onConnect: (HttpClient?, Throwable?) -> Unit, val ss
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
         if(ssl == null) {
-            onConnect(this, null)
+            onConnect?.invoke(this, null)
+            onConnect = null
         } else {
             ssl.handshakeFuture().addListener {
                 if(it.isSuccess) {
-                    onConnect(this, null)
+                    onConnect?.invoke(this, null)
                 } else {
-                    onConnect(null, it.cause())
+                    onConnect?.invoke(null, it.cause())
                 }
+                onConnect = null
             }
         }
     }
