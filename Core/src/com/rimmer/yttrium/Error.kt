@@ -9,7 +9,7 @@ package com.rimmer.yttrium
 class NotFoundException : Exception("not_found")
 
 /** This is mapped to 403 and should be thrown whenever a session has insufficient permissions for an operation. */
-class UnauthorizedException : Exception("no_permission")
+class UnauthorizedException(text: String = "invalid_token") : Exception(text)
 
 /** This is mapped to 400 and should be thrown whenever a request tries to do something that's impossible in that context. */
 class InvalidStateException(cause: String): Exception(cause)
