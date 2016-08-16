@@ -127,6 +127,9 @@ class HttpPooledClient(
             }
         }
 
+        // Retain body in case we need to retry.
+        if(body is ByteBuf) body.retain()
+
         val task = Task<HttpResult>()
         client.get { c, e ->
             if(e == null) {
@@ -144,6 +147,7 @@ class HttpPooledClient(
                         hasResult = true
                         listener?.onContent(result, content, finished)
                         if(finished) {
+                            if(body is ByteBuf) body.release()
                             connection.close()
                             task.finish(result)
                         }
@@ -152,25 +156,31 @@ class HttpPooledClient(
                     override fun onError(error: Throwable) {
                         connection.close()
                         if(hasResult) {
+                            if(body is ByteBuf) body.release()
                             listener?.onError(error)
                             task.fail(error)
                         } else if(error is IOException && retries < maxRetries) {
                             retries++
+                            if(body is ByteBuf) body.retain()
+
                             client.get { c, e ->
                                 if(e == null) {
                                     connection = c!!
                                     connection.request(request, body, this)
                                 } else {
+                                    if(body is ByteBuf) body.release(body.refCnt())
                                     task.fail(e)
                                 }
                             }
                         } else {
+                            if(body is ByteBuf) body.release()
                             task.fail(error)
                         }
                     }
                 }
                 c!!.request(request, body, wrappedListener)
             } else {
+                if(body is ByteBuf) body.release(body.refCnt())
                 task.fail(e)
             }
         }
