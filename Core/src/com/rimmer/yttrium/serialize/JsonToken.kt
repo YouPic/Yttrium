@@ -139,7 +139,7 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
             } else {
                 type = Type.StringLit
             }
-        } else if(isDigit(first)) {
+        } else if(isDigit(first) || first == '-' || first == '+') {
             type = Type.NumberLit
             numberPayload = parseFloat(first)
         } else if(first == 't') {
