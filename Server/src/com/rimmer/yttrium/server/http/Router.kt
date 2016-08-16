@@ -231,7 +231,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             }
 
             // Check if this parameter is used.
-            val name = q.sliceHash(0, separator)
+            val name = URLDecoder.decode(q.substring(0, separator), "UTF-8").hashCode()
             params.forEachIndexed { i, query ->
                 if(query.hash == name && query.type !== BodyContent::class.java) {
                     val string = URLDecoder.decode(q.substring(separator + 1), "UTF-8")
