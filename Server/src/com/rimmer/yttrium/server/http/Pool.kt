@@ -95,6 +95,8 @@ class SingleThreadPool(
                 connection.connection.close()
                 connections.remove(connection)
                 connectionCount--
+                checkConnections()
+
                 get(f)
             } else {
                 f(connection, null)
