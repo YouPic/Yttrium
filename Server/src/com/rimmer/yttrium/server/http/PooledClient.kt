@@ -164,6 +164,8 @@ class HttpPooledClient(
                                     task.fail(e)
                                 }
                             }
+                        } else {
+                            task.fail(error)
                         }
                     }
                 }
