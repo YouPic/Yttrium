@@ -97,38 +97,10 @@ class HttpPooledClient(
 
         val selector = "$domain $isSsl"
 
-
+        val request = genRequest(path, domain, method, headers, body, contentType)
         val client = pool.getOrAdd(selector) { SingleThreadPool(PoolConfiguration(4, maxIdle, maxBusy, debug = debug)) {
             connectHttp(loop, domain, port, isSsl, 30000, useNative, it)
         } }
-
-        val request = if(body === null) {
-            DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path)
-        } else {
-            DefaultHttpRequest(HttpVersion.HTTP_1_1, method, path)
-        }
-
-        val httpHeaders = request.headers()
-        if(headers !== null) {
-            httpHeaders.add(headers)
-        }
-
-        if(!httpHeaders.contains(HttpHeaderNames.HOST)) {
-            httpHeaders[HttpHeaderNames.HOST] = domain
-        }
-
-        if(body !== null) {
-            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
-                httpHeaders[HttpHeaderNames.CONTENT_TYPE] = contentType
-            }
-
-            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && body is ByteBuf) {
-                httpHeaders[HttpHeaderNames.CONTENT_LENGTH] = body.writerIndex()
-            }
-        }
-
-        // Retain body in case we need to retry.
-        if(body is ByteBuf) body.retain()
 
         val task = Task<HttpResult>()
         client.get { c, e ->
@@ -160,13 +132,16 @@ class HttpPooledClient(
                             listener?.onError(error)
                             task.fail(error)
                         } else if(error is IOException && retries < maxRetries) {
+                            if(debug) println("Retrying $method $path")
+
                             retries++
                             if(body is ByteBuf) body.retain()
 
                             client.get { c, e ->
                                 if(e == null) {
                                     connection = c!!
-                                    connection.request(request, body, this)
+                                    val req = genRequest(path, domain, method, headers, body, contentType)
+                                    connection.request(req, body, this)
                                 } else {
                                     if(body is ByteBuf) body.release(body.refCnt())
                                     task.fail(e)
@@ -185,5 +160,44 @@ class HttpPooledClient(
             }
         }
         return task
+    }
+
+    fun genRequest(
+        path: String,
+        domain: String,
+        method: HttpMethod,
+        headers: HttpHeaders? = null,
+        body: Any? = null,
+        contentType: AsciiString? = HttpHeaderValues.APPLICATION_JSON
+    ): HttpRequest {
+        val request = if(body === null) {
+            DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path)
+        } else {
+            DefaultHttpRequest(HttpVersion.HTTP_1_1, method, path)
+        }
+
+        val httpHeaders = request.headers()
+        if(headers !== null) {
+            httpHeaders.add(headers)
+        }
+
+        if(!httpHeaders.contains(HttpHeaderNames.HOST)) {
+            httpHeaders[HttpHeaderNames.HOST] = domain
+        }
+
+        if(body !== null) {
+            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                httpHeaders[HttpHeaderNames.CONTENT_TYPE] = contentType
+            }
+
+            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && body is ByteBuf) {
+                httpHeaders[HttpHeaderNames.CONTENT_LENGTH] = body.writerIndex()
+            }
+        }
+
+        // Retain body in case we need to retry.
+        if(body is ByteBuf) body.retain()
+
+        return request
     }
 }
