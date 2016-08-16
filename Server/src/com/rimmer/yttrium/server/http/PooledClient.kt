@@ -9,9 +9,17 @@ import io.netty.buffer.ByteBuf
 import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
 import io.netty.util.AsciiString
+import java.io.IOException
 import java.util.*
 
-class HttpPooledClient(context: ServerContext, val useNative: Boolean = false) {
+class HttpPooledClient(
+    context: ServerContext,
+    val maxIdle: Long = 60L * 1000L * 1000000L,
+    val maxBusy: Long = 60L * 1000L * 1000000L,
+    val maxRetries: Int = 1,
+    val debug: Boolean = false,
+    val useNative: Boolean = false
+) {
     private val pools: Map<EventLoop, HashMap<String, SingleThreadPool>>
 
     init {
@@ -90,7 +98,7 @@ class HttpPooledClient(context: ServerContext, val useNative: Boolean = false) {
         val selector = "$domain $isSsl"
 
 
-        val client = pool.getOrAdd(selector) { SingleThreadPool(PoolConfiguration(4)) {
+        val client = pool.getOrAdd(selector) { SingleThreadPool(PoolConfiguration(4, maxIdle, maxBusy, debug = debug)) {
             connectHttp(loop, domain, port, isSsl, 30000, useNative, it)
         } }
 
@@ -122,7 +130,44 @@ class HttpPooledClient(context: ServerContext, val useNative: Boolean = false) {
         val task = Task<HttpResult>()
         client.get { c, e ->
             if(e == null) {
-                c!!.request(request, body, wrappedListener(task, listener, c))
+                val wrappedListener = object : HttpListener {
+                    var connection = c!!
+                    var hasResult = false
+                    var retries = 0
+
+                    override fun onResult(result: HttpResult) {
+                        hasResult = true
+                        listener?.onResult(result)
+                    }
+
+                    override fun onContent(result: HttpResult, content: ByteBuf, finished: Boolean) {
+                        hasResult = true
+                        listener?.onContent(result, content, finished)
+                        if(finished) {
+                            connection.close()
+                            task.finish(result)
+                        }
+                    }
+
+                    override fun onError(error: Throwable) {
+                        connection.close()
+                        if(hasResult) {
+                            listener?.onError(error)
+                            task.fail(error)
+                        } else if(error is IOException && retries < maxRetries) {
+                            retries++
+                            client.get { c, e ->
+                                if(e == null) {
+                                    connection = c!!
+                                    connection.request(request, body, this)
+                                } else {
+                                    task.fail(e)
+                                }
+                            }
+                        }
+                    }
+                }
+                c!!.request(request, body, wrappedListener)
             } else {
                 task.fail(e)
             }
