@@ -24,7 +24,7 @@ import java.util.*
 class PoolConfiguration(
     val maxItems: Int,
     val maxIdleTime: Long = 60L * 1000L * 1000000L,
-    val maxBusyTime: Long = 0,
+    val maxBusyTime: Long = 60L * 1000L * 1000000L,
     val maxWaiting: Int = 128,
     val checkDelta: Long = 60L * 1000L * 1000000L,
     val debug: Boolean = false
@@ -87,7 +87,7 @@ class SingleThreadPool(
             val connection = idlePool.pop()
 
             // If the connection timed out or is otherwise unusable, we drop it and create a new one.
-            if(connection.busy || !connection.connected || (System.nanoTime() - connection.lastRequest) > config.maxIdleTime) {
+            if(connection.busy || !connection.connected || connection.idleTime > config.maxIdleTime) {
                 if(config.debug) {
                     println("Closing timed out Http connection.")
                 }
@@ -120,12 +120,12 @@ class SingleThreadPool(
             println("Checking Http clients...")
         }
 
-        val time = System.nanoTime()
         var i = 0
         while(i < connections.size) {
             val c = connections[i]
-            val idle = config.maxIdleTime > 0 && (time - c.lastRequest) > config.maxIdleTime
-            if(idle) {
+            val busy = config.maxBusyTime > 0 && c.busyTime > config.maxBusyTime
+            val idle = config.maxIdleTime > 0 && c.idleTime > config.maxIdleTime
+            if(busy || idle) {
                 connectionCount--
                 c.connection.close()
                 connections.removeAt(i)

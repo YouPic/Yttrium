@@ -81,8 +81,11 @@ interface HttpClient {
     /** Set to true if the connection is currently waiting for a response. */
     val busy: Boolean
 
-    /** The nanoTime timestamp where the last request on this connection was handled. */
-    val lastRequest: Long
+    /** The amount of time this connection has been querying since the query start. If idle, this returns 0. */
+    val busyTime: Long
+
+    /** The amount of time this connection has been idle since the last action. */
+    val idleTime: Long
 }
 
 fun connectHttp(
@@ -116,12 +119,17 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     private var context: ChannelHandlerContext? = null
     private var listener: HttpListener? = null
     private var result: HttpResult? = null
-    private var lastFinish = System.nanoTime()
+    private var requestStart = 0L
+    private var requestEnd = System.nanoTime()
 
     override val connected: Boolean get() = context != null && context!!.channel().isActive
     override val busy: Boolean get() = listener != null
 
-    override val lastRequest: Long get() = lastFinish
+    override val busyTime: Long
+        get() = if(requestStart > 0) System.nanoTime() - requestStart else 0
+
+    override val idleTime: Long
+        get() = if(requestStart > 0) 0L else System.nanoTime() - requestEnd
 
     override fun channelActive(context: ChannelHandlerContext) {
         this.context = context
@@ -156,7 +164,9 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
         } else if(message is HttpContent) {
             val result = result!!
             val finished = if(message is LastHttpContent) {
-                lastFinish = System.nanoTime()
+                requestStart = 0
+                requestEnd = System.nanoTime()
+
                 this.listener = null
                 this.result = null
                 true
@@ -168,7 +178,7 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     }
 
     override fun request(request: HttpRequest, body: Any?, listener: HttpListener) {
-        this.listener = listener
+        onRequest(listener)
         val contentLength: Int
 
         val content = when(body) {
@@ -216,13 +226,13 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     }
 
     override fun request(method: HttpMethod, path: String, listener: HttpListener) {
-        this.listener = listener
+        onRequest(listener)
         val request = DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path)
         context!!.writeAndFlush(request, context!!.voidPromise())
     }
 
     override fun request(method: HttpMethod, path: String, body: Any, listener: HttpListener) {
-        this.listener = listener
+        onRequest(listener)
         val buffer = ByteBufAllocator.DEFAULT.buffer()
         writeJson(body, null, buffer)
         val request = DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path, buffer)
@@ -230,7 +240,7 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     }
 
     override fun request(method: HttpMethod, path: String, body: Array<Pair<String, Any>>, listener: HttpListener) {
-        this.listener = listener
+        onRequest(listener)
         val request = DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, path)
         val encoder = HttpPostRequestEncoder(request, false)
         for((k, v) in body) {
@@ -270,5 +280,10 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
         } else {
             ssl.close().addListener {context?.close()}
         }
+    }
+
+    private fun onRequest(listener: HttpListener) {
+        this.listener = listener
+        requestStart = System.nanoTime()
     }
 }
