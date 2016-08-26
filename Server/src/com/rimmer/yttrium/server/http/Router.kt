@@ -63,7 +63,7 @@ class HttpRouter(
             // Parse any parameters that were provided through the request body.
             // Only parse as form-data if the whole body isn't
             val parseError = if(bodyHandler == null) {
-                if(request.headers()[HttpHeaderNames.CONTENT_TYPE] == "application/json") {
+                if(request.headers()[HttpHeaderNames.CONTENT_TYPE]?.startsWith("application/json") ?: false) {
                     parseJsonBody(route, request, queries)
                 } else if(route.bodyQuery == null) {
                     parseBodyQuery(route, request, queries)
