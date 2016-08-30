@@ -203,6 +203,50 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
                 contentLength = buffer.writerIndex()
                 DefaultLastHttpContent(buffer)
             }
+            is Map<*, *> -> {
+                val encoder = HttpPostRequestEncoder(request, false)
+                for((k, v) in body) {
+                    val key = k.toString()
+                    val attribute = when(v) {
+                        is ByteBuf -> {
+                            val attribute = MemoryAttribute(key)
+                            attribute.setContent(v)
+                            attribute
+                        }
+                        is String -> {
+                            val buffer = v.byteBuf
+                            val attribute = MemoryAttribute(key)
+                            attribute.setContent(buffer)
+                            attribute
+                        }
+                        is ByteString -> {
+                            val attribute = MemoryAttribute(key)
+                            val buffer = ByteBufAllocator.DEFAULT.buffer(body.size)
+                            v.write(buffer)
+                            attribute.setContent(buffer)
+                            attribute
+                        }
+                        is Writable -> {
+                            val buffer = ByteBufAllocator.DEFAULT.buffer()
+                            v.encodeJson(JsonWriter(buffer))
+                            val attribute = MemoryAttribute(key)
+                            attribute.setContent(buffer)
+                            attribute
+                        }
+                        else -> {
+                            val buffer = ByteBufAllocator.DEFAULT.buffer()
+                            writeJson(v, null, buffer)
+                            val attribute = MemoryAttribute(key)
+                            attribute.setContent(buffer)
+                            attribute
+                        }
+                    }
+                    encoder.addBodyHttpData(attribute)
+                }
+
+                context!!.writeAndFlush(encoder.finalizeRequest(), context!!.voidPromise())
+                return
+            }
             else -> {
                 contentLength = 0
                 body
