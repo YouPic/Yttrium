@@ -52,11 +52,8 @@ class Task<T> {
         return this
     }
 
-    /**
-     * Call the provided handler when finished.
-     * @return This task.
-     */
-    inline fun onFinish(crossinline f: (T) -> Unit): Task<T> {
+    /** Call the provided handler when finished. */
+    inline fun onFinish(crossinline f: (T) -> Unit) {
         handler = {r, e ->
             try {
                 r?.let(f)
@@ -64,14 +61,10 @@ class Task<T> {
                 println("Error in task onFinish handler: $e")
             }
         }
-        return this
     }
 
-    /**
-     * Call the provided handler when failed.
-     * @return This task.
-     */
-    inline fun onFail(crossinline f: (Throwable) -> Unit): Task<T> {
+    /** Call the provided handler when failed. */
+    inline fun onFail(crossinline f: (Throwable) -> Unit) {
         handler = {r, e ->
             try {
                 e?.let(f)
@@ -79,7 +72,6 @@ class Task<T> {
                 println("Error in task onFail handler: $e")
             }
         }
-        return this
     }
 
     /** Maps the task through the provided function, returning a new task. */
