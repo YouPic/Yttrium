@@ -1,16 +1,20 @@
 package com.rimmer.yttrium.server.http
 
 import com.rimmer.yttrium.*
-import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
+import com.rimmer.yttrium.router.Route
+import com.rimmer.yttrium.router.RouteContext
+import com.rimmer.yttrium.router.Router
 import com.rimmer.yttrium.router.listener.RouteListener
-import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.serialize.BodyContent
+import com.rimmer.yttrium.serialize.JsonToken
+import com.rimmer.yttrium.serialize.readPrimitive
+import com.rimmer.yttrium.serialize.writeJson
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.multipart.HttpData
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder
-import io.netty.util.AsciiString
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.util.*
@@ -318,14 +322,15 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
                                 // Sometimes body parameters are inside a json string, which we need to support.
                                 // Since we can't know which one it is, we have to try both...
                                 try {
-                                    queries[i] = query.reader!!.fromJson(json)
+                                    if(!json.skipNull()) queries[i] = query.reader!!.fromJson(json)
                                 } catch(e: Throwable) {
                                     buffer.readerIndex(offset)
                                     json.parse()
-                                    queries[i] = query.reader!!.fromJson(JsonToken(json.stringPayload.byteBuf))
+                                    val subJson = JsonToken(json.stringPayload.byteBuf)
+                                    if(!subJson.skipNull()) queries[i] = query.reader!!.fromJson(subJson)
                                 }
                             } else {
-                                queries[i] = query.reader!!.fromJson(json)
+                                if(!json.skipNull()) queries[i] = query.reader!!.fromJson(json)
                             }
                         }
                     }

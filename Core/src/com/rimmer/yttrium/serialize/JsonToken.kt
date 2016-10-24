@@ -105,6 +105,25 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
         return buffer.getByte(buffer.readerIndex()).toChar() == '"'
     }
 
+    fun peekNull(): Boolean {
+        skipWhitespace()
+        return (
+            buffer.readableBytes() >= 4 &&
+            buffer.getByte(buffer.readerIndex()).toChar() == 'n' &&
+            buffer.getByte(buffer.readerIndex() + 1).toChar() == 'u' &&
+            buffer.getByte(buffer.readerIndex() + 2).toChar() == 'l' &&
+            buffer.getByte(buffer.readerIndex() + 3).toChar() == 'l'
+        )
+    }
+
+    fun skipNull(): Boolean {
+        if(peekNull()) {
+            parse()
+            return true
+        }
+        return false
+    }
+
     private fun skipElement() {
         if(type === Type.StartObject) skipObject()
         else if(type === Type.StartArray) skipArray()
