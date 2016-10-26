@@ -33,7 +33,9 @@ class BinaryRouter(
         val id = source.readVarInt()
         val route = segmentMap[id]
         if(route == null) {
-            source.readObject { false }
+            if(target.readableBytes() > 0) {
+                source.readObject { false }
+            }
             error(ResponseCode.NoRoute, "Route $id not found", target, f)
             return
         }

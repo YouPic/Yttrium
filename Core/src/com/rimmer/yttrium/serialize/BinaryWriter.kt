@@ -26,7 +26,7 @@ fun ByteBuf.writeBinary(b: ByteBuf) {
 fun ByteBuf.writeVarInt(value: Int) {
     var v = value
     do {
-        if(v and 0x7f.inv() != 0) {
+        if(v > 0x7f) {
             writeByte(v.toInt() or 0x80)
         } else {
             writeByte(v.toInt())
@@ -42,7 +42,7 @@ fun ByteBuf.writeVarLong(value: Long) {
     var v = value
 
     do {
-        if(v and 0x7fL.inv() != 0L) {
+        if(v > 0x7f) {
             writeByte(v.toInt() or 0x80)
         } else {
             writeByte(v.toInt())
