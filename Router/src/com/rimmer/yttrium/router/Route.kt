@@ -36,7 +36,7 @@ class Route(
 /** Interface that can be used by plugins to modify the signature of a route. */
 interface RouteModifier {
     /** The parameter types that need to be provided to the route handler. */
-    val parameterTypes: Array<Class<*>>
+    val parameterTypes: List<Class<*>>
 
     /**
      * Indicates that this plugin will provide this parameter to the route handler.

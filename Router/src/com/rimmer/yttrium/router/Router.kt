@@ -43,11 +43,19 @@ class Router(plugins: List<Plugin<in Any>>) {
 
         val typedSegments = funSegments.filter { it.reader !== null }.toTypedArray()
         val providers = Array(typedSegments.size + funQueries.size) { false }
-        val types = (typedSegments.map { it.type!! } + funQueries.map { it.type }).toTypedArray()
+
+        val types = ArrayList<Class<*>>()
+        typedSegments.forEach {
+            types.add(it.type!!)
+        }
+        funQueries.forEach {
+            types.add(it.type)
+        }
+
         val readers = (typedSegments.map { it.reader } + funQueries.map { it.reader }).toTypedArray()
 
         val modifier = object: RouteModifier {
-            override val parameterTypes: Array<Class<*>> get() = types
+            override val parameterTypes: List<Class<*>> get() = types
             override fun provideParameter(index: Int) { providers[index] = true }
 
             override fun addPath(s: List<PathSegment>): Int {
@@ -60,6 +68,7 @@ class Router(plugins: List<Plugin<in Any>>) {
                 val hash = name.hashCode()
                 val id = queries.size
                 queries.add(RouteQuery(name, hash, type, reader, false, null, description))
+                types.add(type)
                 return id
             }
 
@@ -67,6 +76,7 @@ class Router(plugins: List<Plugin<in Any>>) {
                 val hash = name.hashCode()
                 val id = queries.size
                 queries.add(RouteQuery(name, hash, type, reader, true, default, description))
+                types.add(type)
                 return id
             }
         }
