@@ -5,7 +5,6 @@ import com.rimmer.yttrium.router.plugin.Plugin
 import com.rimmer.yttrium.serialize.BodyContent
 import com.rimmer.yttrium.serialize.Reader
 import com.rimmer.yttrium.serialize.Writer
-import com.rimmer.yttrium.serialize.unitReader
 import java.util.*
 
 class RoutePlugin(val plugin: Plugin<in Any>, val context: Any)
@@ -18,15 +17,6 @@ class BuilderQuery(
 class Router(plugins: List<Plugin<in Any>>) {
     val pluginMap = plugins.associateBy { it.name }
     val routes = ArrayList<Route>()
-    val swagger = Swagger()
-    var currentCategory = swagger.addCategory("None")
-
-    inline fun category(name: String, paths: Router.() -> Unit) {
-        val oldCategory = currentCategory
-        currentCategory = swagger.addCategory(name)
-        paths()
-        currentCategory = oldCategory
-    }
 
     fun addRoute(
         method: HttpMethod,
@@ -38,132 +28,79 @@ class Router(plugins: List<Plugin<in Any>>) {
         writer: Writer<*>?,
         call: RouteContext.(Array<Any?>) -> Task<*>
     ) {
-        val segments = funSegments.toMutableList()
-        val queries = ArrayList<RouteQuery>()
+        val args = ArrayList<Arg>()
+        val segments = ArrayList<Segment>()
+        funSegments.transformSegments(args, segments, ArgVisibility.Default)
 
-        val typedSegments = funSegments.filter { it.reader !== null }.toTypedArray()
-        val providers = Array(typedSegments.size + funQueries.size) { false }
-
-        val types = ArrayList<Class<*>>()
-        typedSegments.forEach {
-            types.add(it.type!!)
-        }
         funQueries.forEach {
-            types.add(it.type)
+            args.add(Arg(it.name, ArgVisibility.Default, false, it.optional, it.default, it.type, it.reader))
         }
 
-        val readers = (typedSegments.map { it.reader } + funQueries.map { it.reader }).toTypedArray()
-
+        // Create a route modifier for plugins.
         val modifier = object: RouteModifier {
-            override val parameterTypes: List<Class<*>> get() = types
-            override fun provideParameter(index: Int) { providers[index] = true }
+            override val segments: List<Segment> get() = segments
+            override val args: List<Arg> get() = args
+
+            override fun provideFunArg(index: Int) {
+                args[index] = args[index].copy(visibility = ArgVisibility.Internal)
+            }
 
             override fun addPath(s: List<PathSegment>): Int {
-                val id = segments.sumBy { if(it.reader != null) 1 else 0 }
-                segments.addAll(s)
+                val id = args.size
+                s.transformSegments(args, segments, ArgVisibility.External)
                 return id
             }
 
-            override fun addArg(name: String, type: Class<*>, reader: Reader, description: String): Int {
-                val hash = name.hashCode()
-                val id = queries.size
-                queries.add(RouteQuery(name, hash, type, reader, false, null, description))
-                types.add(type)
+            override fun addArg(name: String, type: Class<*>, reader: Reader?): Int {
+                val id = args.size
+                args.add(Arg(name, ArgVisibility.External, false, false, null, type, reader))
                 return id
             }
 
-            override fun addOptional(name: String, type: Class<*>, reader: Reader, default: Any?, description: String): Int {
-                val hash = name.hashCode()
-                val id = queries.size
-                queries.add(RouteQuery(name, hash, type, reader, true, default, description))
-                types.add(type)
+            override fun addOptional(name: String, type: Class<*>, reader: Reader?, default: Any?): Int {
+                val id = args.size
+                args.add(Arg(name, ArgVisibility.External, false, true, default, type, reader))
                 return id
             }
         }
 
-        // Find the plugins that will be applied to this route.
-        val usedPlugins = ArrayList<RoutePlugin>()
-        for(p in plugins) {
-            val context = p.modifyRoute(modifier, properties)!!
-            usedPlugins.add(RoutePlugin(p, context))
-        }
+        // Apply all plugins for this route.
+        val usedPlugins = plugins.map { RoutePlugin(it, it.modifyRoute(modifier, properties)!!) }
 
-        // Create the swagger route.
-        val swaggerRoute = Swagger.Route(
-            Swagger.PathInfo(buildSwaggerPath(segments), buildEquivalencePath(segments), currentCategory.name),
-            method, version
-        )
-        swagger.addRoute(swaggerRoute, currentCategory)
-
-        // Apply the plugins to swagger.
-        for(p in usedPlugins) {
-            p.plugin.modifySwagger(p.context, swaggerRoute)
-        }
-
-        // Create a list of path parameter -> handler parameter bindings.
-        // Only use the original segments here - any segments added by plugins should be handled by those.
-        if(providers.size < typedSegments.size) {
-            throw IllegalArgumentException("Each path parameter must have a corresponding function argument.")
-        }
-
-        val pathBindings = ArrayList<Int>()
-        typedSegments.forEachIndexed { i, segment ->
-            if(providers[i]) {
-                throw IllegalArgumentException("Defined path parameter ${segment.name} cannot be provided a plugin.")
-            }
-
-            pathBindings.add(i)
-            swaggerRoute.parameters.add(Swagger.Parameter(
-                segment.name, Swagger.ParameterType.Path, "", types[i], false
-            ))
-        }
-
-        // Create a list of query parameter -> handler parameter bindings.
-        // Arguments that are already provided by a plugin are presumed to be used by that plugin.
-        val firstQuery = typedSegments.size
-        val existingQueries = queries.size
-        val queryBindings = ArrayList<Int>()
-        funQueries.forEachIndexed { i, q ->
-            val index = firstQuery + i
-            if(!providers[index]) {
-                queryBindings.add(index)
-                queries.add(RouteQuery(
-                    q.name, q.name.hashCode(), q.type, q.reader, q.optional, q.default, q.description
-                ))
-                swaggerRoute.parameters.add(Swagger.Parameter(
-                    q.name, Swagger.ParameterType.Query, q.description, q.type, q.default !== null
-                ))
-            }
-        }
-
-        // If the segment list is empty, we have a root path.
-        // Since the root still technically has one segment (an empty one) we add it ourselves.
+        // If the segment list is still empty, we add a dummy element to simplify handler code.
         if(segments.isEmpty()) {
-            segments.add(PathSegment("", null, null))
+            segments.add(Segment("", null, -1))
         }
 
-        // Create the route handler.
-        val name = "$method ${swaggerRoute.info.path}"
-        val inputSegments = segments.filter { it.type !== null }.toTypedArray()
-        val bodyQuery = queries.indexOfFirst { it.type === BodyContent::class.java }
-        val route = Route(
+        // Create the route and handler.
+        val name = "$method ${buildSwaggerPath(segments)}"
+        val bodyQuery = args.indexOfFirst { it.type === BodyContent::class.java }
+
+        routes.add(Route(
             name, method, version,
             segments.toTypedArray(),
-            inputSegments,
-            queries.toTypedArray(),
+            segments.filter { it.arg != null }.toTypedArray(),
+            args.toTypedArray(),
             writer,
-            if(bodyQuery == -1) null else bodyQuery
-        )
+            if(bodyQuery == -1) null else bodyQuery,
+            RouteHandler(usedPlugins, call)
+        ))
+    }
+}
 
-        route.handler = routeHandler(
-            route,
-            usedPlugins,
-            pathBindings.toIntArray(),
-            queryBindings.toIntArray(),
-            existingQueries,
-            readers.size,
-            call
-        )
-        routes.add(route)
+private fun Collection<PathSegment>.transformSegments(
+    args: MutableList<Arg>,
+    segments: MutableList<Segment>,
+    visibility: ArgVisibility
+) {
+    forEach {
+        if(it.type == null) {
+            segments.add(Segment(it.name, null, -1))
+        } else {
+            val arg = Arg(it.name, visibility, true, false, null, it.type, it.reader)
+            val i = args.size
+            args.add(arg)
+            segments.add(Segment(it.name, arg, i))
+        }
     }
 }

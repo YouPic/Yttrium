@@ -16,12 +16,12 @@ class AddressPlugin: Plugin<Int> {
     override val name = "AddressPlugin"
 
     override fun modifyRoute(modifier: RouteModifier, properties: List<RouteProperty>): Int {
-        return modifier.provide(IPAddress::class.java) ?:
+        return modifier.provideFunArg(IPAddress::class.java) ?:
             throw IllegalArgumentException("No parameter of type IPAddress exists.")
     }
 
-    override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {
-        arguments[context] = IPAddress(route.sourceIp)
+    override fun modifyCall(context: Int, route: RouteContext, f: (Throwable?) -> Unit) {
+        route.parameters[context] = IPAddress(route.sourceIp)
         f(null)
     }
 }

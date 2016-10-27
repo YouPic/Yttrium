@@ -8,14 +8,14 @@ import com.rimmer.yttrium.serialize.Reader
  * For a parameter segment, this is the parameter name.
  * @param type If set, this is a parameter segment that should be parsed to this type.
  */
-class PathSegment(val name: String, val type: Class<*>?, val reader: Reader?)
+data class PathSegment(val name: String, val type: Class<*>?, val reader: Reader?)
 
 /** Converts the provided segments into Swagger format. */
-fun buildSwaggerPath(segments: List<PathSegment>): String {
+fun buildSwaggerPath(segments: List<Segment>): String {
     val builder = StringBuilder()
     for(segment in segments) {
         builder.append('/')
-        if(segment.reader == null) {
+        if(segment.arg == null) {
             builder.append(segment.name)
         } else {
             builder.append('{')
@@ -27,11 +27,11 @@ fun buildSwaggerPath(segments: List<PathSegment>): String {
 }
 
 /** Converts the provided segments into Swagger format. */
-fun buildEquivalencePath(segments: List<PathSegment>): String {
+fun buildEquivalencePath(segments: List<Segment>): String {
     val builder = StringBuilder()
     for(segment in segments) {
         builder.append('/')
-        if(segment.reader == null) {
+        if(segment.arg == null) {
             builder.append(segment.name)
         } else {
             builder.append('*')

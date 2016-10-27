@@ -1,7 +1,8 @@
 package com.rimmer.yttrium.router.plugin
 
-import com.rimmer.yttrium.router.*
-import java.lang.reflect.Type
+import com.rimmer.yttrium.router.RouteContext
+import com.rimmer.yttrium.router.RouteModifier
+import com.rimmer.yttrium.router.RouteProperty
 
 /** Defines a Router plugin for using custom annotations and parameter types in routes. */
 interface Plugin<Context> {
@@ -15,19 +16,11 @@ interface Plugin<Context> {
     fun modifyRoute(modifier: RouteModifier, properties: List<RouteProperty>): Context
 
     /**
-     * Modifies the swagger data for this route, adding any parameters for this plugin.
-     * This is called once at route creation time.
-     */
-    fun modifySwagger(context: Context, route: Swagger.Route) {}
-
-    /**
      * Adds any function parameters needed for this plugin before calling the route handler.
      * This is called for every request to this route.
      * When done, call the provided callback to continue the route request.
-     * @param arguments A list of arguments with the same order as in isUsed.
-     * The plugin should set any arguments it indicated itself as a provider for.
      */
-    fun modifyCall(context: Context, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) = f(null)
+    fun modifyCall(context: Context, route: RouteContext, f: (Throwable?) -> Unit) = f(null)
 
     /**
      * Modifies the result returned by the route handler if needed.
