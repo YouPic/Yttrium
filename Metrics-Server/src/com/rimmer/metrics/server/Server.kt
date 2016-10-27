@@ -30,7 +30,7 @@ fun storeServer(context: ServerContext, store: MetricStore, port: Int, useNative
                     is ErrorPacket -> store.onError(it, name, ip.ip)
                 }
             }
-            finish()
+            finished(Unit)
         }
     )
 

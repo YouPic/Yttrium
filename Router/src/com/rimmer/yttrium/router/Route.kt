@@ -110,6 +110,7 @@ class RouteQuery(
  * @param pathParameters The path parameters that were sent to the route.
  * @param queryParameters The query parameters that were sent to the route.
  * @param listenerData Data used by the first listener.
+ * @param channelPrivate If set, the channel for this context will only be used for communication with a single client.
  */
 class RouteContext(
     val channel: ChannelHandlerContext,
@@ -118,10 +119,6 @@ class RouteContext(
     val route: Route,
     val pathParameters: Array<Any?>,
     val queryParameters: Array<Any?>,
-    listenerData: Any?
-): Context(eventLoop, listenerData) {
-    fun <T> finish(v: T) = Task<T>().finish(v)
-    fun finish() = Task<Unit>().finish(Unit)
-
-    fun <T> fail(cause: Throwable) = Task<T>().fail(cause)
-}
+    listenerData: Any?,
+    val channelPrivate: Boolean
+): Context(eventLoop, listenerData)

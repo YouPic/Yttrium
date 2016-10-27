@@ -91,7 +91,7 @@ class BinaryRouter(
             }
 
             // Run the route handler.
-            val routeContext = RouteContext(context, remote, eventLoop, route, params, queries, callData)
+            val routeContext = RouteContext(context, remote, eventLoop, route, params, queries, callData, true)
             try {
                 route.handler(routeContext, listener)
             } catch(e: Throwable) {
@@ -103,7 +103,7 @@ class BinaryRouter(
             mapError(error, target, f)
 
             // We don't have the call parameters here, so we just send a route context without them.
-            val routeContext = RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callData)
+            val routeContext = RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callData, true)
             listener?.onFail(routeContext, e, callData)
         }
     }

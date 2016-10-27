@@ -98,10 +98,10 @@ class HttpRouter(
                 }
             }
 
-            route.handler(RouteContext(context, remote, eventLoop, route, params, queries, callId), listener)
+            route.handler(RouteContext(context, remote, eventLoop, route, params, queries, callId, false), listener)
         } catch(e: Throwable) {
             // We don't have the call parameters here, so we just send a route context without them.
-            fail(RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callId), e)
+            fail(RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callId, false), e)
         }
     }
 }
