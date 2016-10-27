@@ -1,10 +1,8 @@
 package com.rimmer.yttrium.server.http
 
 import com.rimmer.yttrium.*
+import com.rimmer.yttrium.router.*
 import com.rimmer.yttrium.router.HttpMethod
-import com.rimmer.yttrium.router.Route
-import com.rimmer.yttrium.router.RouteContext
-import com.rimmer.yttrium.router.Router
 import com.rimmer.yttrium.router.listener.RouteListener
 import com.rimmer.yttrium.serialize.BodyContent
 import com.rimmer.yttrium.serialize.JsonToken
@@ -30,8 +28,8 @@ class HttpRouter(
 
     override fun invoke(context: ChannelHandlerContext, request: FullHttpRequest, f: (HttpResponse) -> Unit) {
         // Check if the request contains a version request.
-        val acceptVersion = request.headers().get(HttpHeaderNames.ACCEPT)?.let {maybeParseInt(it)}
-        val version = acceptVersion ?: request.headers().get("API-VERSION")?.let { maybeParseInt(it) } ?: 0
+        val acceptVersion = request.headers().get(HttpHeaderNames.ACCEPT)?.let(::maybeParseInt)
+        val version = acceptVersion ?: request.headers().get("API-VERSION")?.let(::maybeParseInt) ?: 0
         val remote = request.headers().get("X-Forwarded-For") ?:
             (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
 
@@ -58,8 +56,8 @@ class HttpRouter(
         }
 
         try {
-            val params = parseParameters(route, parameters)
             val queries = parseQuery(route, request.uri())
+            parseParameters(route, parameters, queries)
             val content = request.content()
             val contentStart = content.readerIndex()
             val bodyHandler = route.bodyQuery
@@ -78,7 +76,7 @@ class HttpRouter(
             }
 
             // Make sure all required parameters were provided, and handle optional ones.
-            checkQueries(route, queries, parseError)
+            checkArgs(route, queries, parseError)
 
             // Call the route with a listener that sends the result back to the client.
             val listener = object: RouteListener {
@@ -98,10 +96,10 @@ class HttpRouter(
                 }
             }
 
-            route.handler(RouteContext(context, remote, eventLoop, route, params, queries, callId, false), listener)
+            route.handler(RouteContext(context, remote, eventLoop, route, queries, callId, false), listener)
         } catch(e: Throwable) {
             // We don't have the call parameters here, so we just send a route context without them.
-            fail(RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callId, false), e)
+            fail(RouteContext(context, remote, eventLoop, route, emptyArray(), callId, false), e)
         }
     }
 }
@@ -123,10 +121,10 @@ private class HttpSegment(
 private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpSegment {
     val (endPoints, wildcardEndpoints) = routes.filter {
         it.segments.size == segmentIndex + 1
-    }.sortedByDescending {
-        it.version
-    }.partition {
-        it.segments[segmentIndex].reader === null
+    }.sortedByDescending(
+        Route::version
+    ).partition {
+        it.segments[segmentIndex].arg === null
     }.run {
         first.toTypedArray() to second.toTypedArray()
     }
@@ -137,7 +135,7 @@ private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpS
     }.toIntArray()
 
     val groups = routes.filter {
-        it.segments.size > segmentIndex + 1 && it.segments[segmentIndex].reader === null
+        it.segments.size > segmentIndex + 1 && it.segments[segmentIndex].arg === null
     }.groupBy {
         it.segments[segmentIndex].name
     }
@@ -146,7 +144,7 @@ private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpS
     val nextHashes = groups.map { it.key.hashCode() }.toIntArray()
 
     val wildcardRoutes = routes.filter {
-        it.segments.size > segmentIndex + 1 && it.segments[segmentIndex].reader !== null
+        it.segments.size > segmentIndex + 1 && it.segments[segmentIndex].arg !== null
     }
     val wildcards = if(wildcardRoutes.size > 0) buildSegments(wildcardRoutes, segmentIndex + 1) else null
 
@@ -199,24 +197,28 @@ private fun findRoute(segment: HttpSegment, parameters: ArrayList<String>, versi
     return wildcard
 }
 
+private fun argApplicable(name: Int, arg: Arg) =
+    arg.name.hashCode() == name &&
+    arg.visibility !== ArgVisibility.Internal &&
+    arg.isPath == false &&
+    arg.type !== BodyContent::class.java
+
 /**
  * Parses the parameter list returned by findHandler into the correct types.
  * @param parameters A reverse list of path parameters for this route.
  */
-private fun parseParameters(route: Route, parameters: Iterable<String>): Array<Any?> {
+private fun parseParameters(route: Route, parameters: Iterable<String>, args: Array<Any?>) {
     val length = route.typedSegments.size
-    val array = arrayOfNulls<Any>(length)
     parameters.forEachIndexed { i, p ->
-        val index = length - i - 1
+        val segment = route.typedSegments[length - i - 1]
         val string = URLDecoder.decode(p, "UTF-8")
-        array[index] = readPrimitive(string, route.typedSegments[index].reader!!.target)
+        args[segment.argIndex] = readPrimitive(string, segment.arg!!.reader!!.target)
     }
-    return array
 }
 
 /** Parses the query parameters for this route into `queries`. Returns an error string if the url is invalid. */
 private fun parseQuery(route: Route, url: String): Array<Any?> {
-    val params = route.queries
+    val params = route.args
     val query = url.substringAfter('?', "")
     val values = arrayOfNulls<Any>(params.size)
 
@@ -237,7 +239,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             // Check if this parameter is used.
             val name = URLDecoder.decode(q.substring(0, separator), "UTF-8").hashCode()
             params.forEachIndexed { i, query ->
-                if(query.hash == name && query.type !== BodyContent::class.java) {
+                if(argApplicable(name, query)) {
                     val string = URLDecoder.decode(q.substring(separator + 1), "UTF-8")
                     try {
                         values[i] = readPrimitive(string, query.type)
@@ -245,7 +247,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
                         // Also try to parse as url-encoded json.
                         if(query.reader !== null) {
                             val json = JsonToken(string.byteBuf)
-                            values[i] = query.reader!!.fromJson(json)
+                            values[i] = query.reader.fromJson(json)
                         } else throw e
                     }
                 }
@@ -269,8 +271,8 @@ fun parseBodyQuery(route: Route, request: FullHttpRequest, queries: Array<Any?>)
 
             // Check if this parameter is recognized.
             val name = p.name.hashCode()
-            route.queries.forEachIndexed { i, query ->
-                if(query.hash == name && query.type !== BodyContent::class.java) {
+            route.args.forEachIndexed { i, query ->
+                if(argApplicable(name, query)) {
                     val buffer = p.byteBuf
                     val index = buffer.readerIndex()
 
@@ -313,8 +315,8 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
                 } else if(json.type == JsonToken.Type.FieldName) {
                     val name = json.stringPayload.hashCode()
                     var found = false
-                    route.queries.forEachIndexed { i, query ->
-                        if(query.hash == name && query.type !== BodyContent::class.java) {
+                    route.args.forEachIndexed { i, query ->
+                        if(argApplicable(name, query)) {
                             found = true
                             val offset = buffer.readerIndex()
 
@@ -351,18 +353,17 @@ fun parseJsonBody(route: Route, request: FullHttpRequest, queries: Array<Any?>):
 }
 
 /** Makes sure that all required query parameters have been set correctly. */
-fun checkQueries(route: Route, args: Array<Any?>, parseError: Throwable?) {
-    route.queries.forEachIndexed { i, query ->
+fun checkArgs(route: Route, args: Array<Any?>, parseError: Throwable?) {
+    route.args.forEachIndexed { i, query ->
         val v = args[i]
-        if(v == null) {
+        if(v == null && query.visibility.exported) {
             if(query.optional) {
                 args[i] = query.default
             } else {
-                val description = if(query.description.isNotEmpty()) "(${query.description})" else "(no description)"
                 val type = "of type ${query.type.simpleName}"
                 val error = if(parseError != null) "due to $parseError" else ""
                 throw InvalidStateException(
-                    "Request to ${route.name} is missing required query parameter \"${query.name}\" $description $type $error"
+                    "Request to ${route.name} is missing required query parameter \"${query.name}\" $type $error"
                 )
             }
         }

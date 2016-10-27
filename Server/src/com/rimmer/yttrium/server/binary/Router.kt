@@ -9,11 +9,12 @@ import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.Router
 import com.rimmer.yttrium.router.listener.RouteListener
 import com.rimmer.yttrium.serialize.*
-import com.rimmer.yttrium.server.http.checkQueries
+import com.rimmer.yttrium.server.http.checkArgs
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
 import java.net.InetSocketAddress
+import java.util.*
 
 enum class ResponseCode {
     Success, NoRoute, NotFound, InvalidArgs, NoPermission, InternalError, MiscError
@@ -22,17 +23,37 @@ enum class ResponseCode {
 fun routeHash(r: Route) = routeHash(r.name, r.version)
 fun routeHash(name: String, version: Int = 0) = name.hashCode() + version * 3452056
 
+class BinaryRoute(
+    val route: Route,
+    val argCount: Int,
+    val readers: Array<(ByteBuf) -> Any>,
+    val map: ByteArray
+)
+
 class BinaryRouter(
     val router: Router,
     val listener: RouteListener? = null
 ): (ChannelHandlerContext, ByteBuf, ByteBuf, () -> Unit) -> Unit {
-    private val segmentMap = router.routes.associateBy { routeHash(it) }
+    private val segmentMap = router.routes.associateBy(::routeHash).mapValues {
+        val args = it.value.args
+        val readers = ArrayList<(ByteBuf) -> Any>()
+        val map = ArrayList<Byte>()
+
+        args.forEachIndexed { i, it ->
+            if(it.visibility.exported) {
+                readers.add(it.reader!!.fromBinary)
+                map.add(i.toByte())
+            }
+        }
+
+        BinaryRoute(it.value, args.size, readers.toTypedArray(), map.toByteArray())
+    }
 
     override fun invoke(context: ChannelHandlerContext, source: ByteBuf, target: ByteBuf, f: () -> Unit) {
         val remote = (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
         val id = source.readVarInt()
-        val route = segmentMap[id]
-        if(route == null) {
+        val binaryRoute = segmentMap[id]
+        if(binaryRoute == null) {
             if(target.readableBytes() > 0) {
                 source.readObject { false }
             }
@@ -40,12 +61,15 @@ class BinaryRouter(
             return
         }
 
+        val route = binaryRoute.route
         val eventLoop = context.channel().eventLoop()
         val callData = listener?.onStart(eventLoop, route)
-        val params = arrayOfNulls<Any>(route.typedSegments.size)
-        val paramCount = params.size
-        val queries = arrayOfNulls<Any>(route.queries.size)
+
+        val params = arrayOfNulls<Any>(binaryRoute.argCount)
         val writer = route.writer
+        val readers = binaryRoute.readers
+        val map = binaryRoute.map
+        val max = map.size
 
         // We can't really detect specific problems in the call parameters
         // without making everything really complicated,
@@ -53,20 +77,16 @@ class BinaryRouter(
         try {
             if(source.readableBytes() > 0) {
                 source.readObject {
-                    if (it > paramCount + queries.size) {
-                        false
-                    } else if (it >= paramCount) {
-                        val i = it - paramCount
-                        queries[i] = route.queries[i].reader!!.fromBinary(source)
-                        true
-                    } else {
-                        params[it] = route.typedSegments[it].reader!!.fromBinary(source)
-                        true
+                    val handled = it < max
+                    if(handled) {
+                        val i = map[it].toInt()
+                        params[i] = readers[i](source)
                     }
+                    handled
                 }
             }
 
-            checkQueries(route, queries, null)
+            checkArgs(route, params, null)
 
             // Create a secondary listener that writes responses to the caller before forwarding to the original one.
             val listener = object: RouteListener {
@@ -91,7 +111,7 @@ class BinaryRouter(
             }
 
             // Run the route handler.
-            val routeContext = RouteContext(context, remote, eventLoop, route, params, queries, callData, true)
+            val routeContext = RouteContext(context, remote, eventLoop, route, params, callData, true)
             try {
                 route.handler(routeContext, listener)
             } catch(e: Throwable) {
@@ -103,17 +123,17 @@ class BinaryRouter(
             mapError(error, target, f)
 
             // We don't have the call parameters here, so we just send a route context without them.
-            val routeContext = RouteContext(context, remote, eventLoop, route, emptyArray(), emptyArray(), callData, true)
+            val routeContext = RouteContext(context, remote, eventLoop, route, emptyArray(), callData, true)
             listener?.onFail(routeContext, e, callData)
         }
     }
 
     fun mapError(error: Throwable?, target: ByteBuf, f: () -> Unit) = when(error) {
-        is InvalidStateException -> error(ResponseCode.InvalidArgs, error.message ?: "bad request", target, f)
+        is InvalidStateException -> error(ResponseCode.InvalidArgs, error.message ?: "bad_request", target, f)
         is UnauthorizedException -> error(ResponseCode.NoPermission, error.message ?: "forbidden", target, f)
-        is NotFoundException -> error(ResponseCode.NotFound, error.message ?: "not found", target, f)
+        is NotFoundException -> error(ResponseCode.NotFound, error.message ?: "not_found", target, f)
         is HttpException -> error(ResponseCode.MiscError, error.message ?: "error", target, f)
-        else -> error(ResponseCode.InternalError, "internal error", target, f)
+        else -> error(ResponseCode.InternalError, "internal_error", target, f)
     }
 
     fun error(code: ResponseCode, desc: String, target: ByteBuf, f: () -> Unit) {
@@ -124,6 +144,6 @@ class BinaryRouter(
 
     fun convertDecodeError(error: Throwable?) = when(error) {
         is InvalidStateException -> error
-        else -> InvalidStateException("invalid call parameter")
+        else -> InvalidStateException("invalid_call")
     }
 }

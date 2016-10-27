@@ -63,8 +63,8 @@ class PasswordPlugin(val password: String): Plugin<Int> {
         return modifier.addArg("password", String::class.java, stringReader)
     }
 
-    override fun modifyCall(context: Int, route: RouteContext, arguments: Array<Any?>, f: (Throwable?) -> Unit) {
-        if((route.queryParameters[context] as String) != password) f(UnauthorizedException())
+    override fun modifyCall(context: Int, route: RouteContext, f: (Throwable?) -> Unit) {
+        if((route.parameters[context] as String) != password) f(UnauthorizedException())
         else f(null)
     }
 }

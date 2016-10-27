@@ -77,9 +77,9 @@ class HttpHandler(
     }
 
     companion object {
-        val allowedHeaders = AsciiString.of("Accept,API-VERSION,Content-Type")
-        val allowedMethods = AsciiString.of("DELETE,POST,GET,PUT")
-        val allowedOrigin = AsciiString.of("*")
-        val allowedAge = AsciiString.of("3628800")
+        val allowedHeaders: AsciiString = AsciiString.of("Accept,API-VERSION,Content-Type")
+        val allowedMethods: AsciiString = AsciiString.of("DELETE,POST,GET,PUT")
+        val allowedOrigin: AsciiString = AsciiString.of("*")
+        val allowedAge: AsciiString = AsciiString.of("3628800")
     }
 }

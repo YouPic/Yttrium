@@ -20,7 +20,7 @@ inline fun connect(
     crossinline onFail: (Throwable?) -> Unit
 ): ChannelFuture {
     val channelType = if(useNative && Epoll.isAvailable()) {
-        EpollSocketChannel::class.java as Class<out Channel>
+        EpollSocketChannel::class.java
     } else {
         NioSocketChannel::class.java
     }
