@@ -137,7 +137,11 @@ class JsonWriter(val buffer: ByteBuf) {
     fun value(i: Int) = value(i.toLong())
     fun value(i: Short) = value(i.toLong())
     fun value(i: Byte) = value(i.toLong())
-    fun value(i: Boolean) = buffer.writeBytes(if(i) trueBytes else falseBytes)
+
+    fun value(i: Boolean): JsonWriter {
+        buffer.writeBytes(if(i) trueBytes else falseBytes)
+        return this
+    }
 
     companion object {
         val trueBytes = "true".toByteArray()
