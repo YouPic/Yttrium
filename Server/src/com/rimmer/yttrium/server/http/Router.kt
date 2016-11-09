@@ -239,14 +239,16 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
             params.forEachIndexed { i, query ->
                 if(query.hash == name && query.type !== BodyContent::class.java) {
                     val string = URLDecoder.decode(q.substring(separator + 1), "UTF-8")
-                    try {
-                        values[i] = readPrimitive(string, query.type)
-                    } catch(e: Throwable) {
-                        // Also try to parse as url-encoded json.
-                        if(query.reader !== null) {
-                            val json = JsonToken(string.byteBuf)
-                            values[i] = query.reader!!.fromJson(json)
-                        } else throw e
+                    if(string.isNotEmpty()) {
+                        try {
+                            values[i] = readPrimitive(string, query.type)
+                        } catch(e: Throwable) {
+                            // Also try to parse as url-encoded json.
+                            if(query.reader !== null) {
+                                val json = JsonToken(string.byteBuf)
+                                values[i] = query.reader!!.fromJson(json)
+                            } else throw e
+                        }
                     }
                 }
             }
