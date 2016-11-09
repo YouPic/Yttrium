@@ -136,7 +136,7 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
             parse()
             if(type === Type.EndObject) return
             else if(type === Type.FieldName) skipValue()
-            else throw InvalidStateException("Invalid json: Expected field name")
+            else throw InvalidStateException("Invalid json: Expected field name, got $type")
         }
     }
 
@@ -180,7 +180,7 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
             expectChar('l')
             type = Type.NullLit
         } else {
-            throw InvalidStateException("Invalid json: expected a value")
+            throw InvalidStateException("Invalid json: expected a value, got '$first'")
         }
     }
 
@@ -342,12 +342,12 @@ fun parseHexit(c: Byte): Int {
     val index = ch - '0'.toByte()
 
     if(index < 0 || index > 54) {
-        throw InvalidStateException("Invalid json: expected unicode sequence")
+        throw InvalidStateException("Invalid json: expected unicode sequence, got '$c'")
     }
 
     val res = parseHexitLookup[index]
     if(res > 15) {
-        throw InvalidStateException("Invalid json: expected unicode sequence")
+        throw InvalidStateException("Invalid json: expected unicode sequence, got '$c'")
     }
 
     return res
