@@ -94,6 +94,8 @@ class Task<T> {
         return task
     }
 
+    inline fun <U> mapMaybeNull(crossinline f: (T?) -> U?) = mapMaybe(f)
+
     /** Maps the task through the provided functions, returning a new task. */
     inline fun <U> map(crossinline succeed: (T) -> U, crossinline fail: (Throwable) -> U) = mapMaybe({succeed(it!!)}, fail)
 
@@ -134,6 +136,29 @@ class Task<T> {
                     next.handler = {r, e ->
                         if(e == null) {
                             task.finish(r!!)
+                        } else {
+                            task.fail(e)
+                        }
+                    }
+                } catch(e: Throwable) {
+                    task.fail(e)
+                }
+            } else {
+                task.fail(e)
+            }
+        }
+        return task
+    }
+
+    inline fun <U> thenMaybeNull(crossinline f: (T?) -> Task<U?>): Task<U?> {
+        val task = Task<U?>()
+        handler = {r, e ->
+            if(e == null) {
+                try {
+                    val next = f(r)
+                    next.handler = {r, e ->
+                        if(e == null) {
+                            task.finish(r)
                         } else {
                             task.fail(e)
                         }

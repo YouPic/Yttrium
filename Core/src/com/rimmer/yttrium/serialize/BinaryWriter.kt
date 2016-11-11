@@ -26,7 +26,7 @@ fun ByteBuf.writeBinary(b: ByteBuf) {
 fun ByteBuf.writeVarInt(value: Int) {
     var v = value
     do {
-        if(v > 0x7f) {
+        if(Integer.compareUnsigned(v, 0x7f) > 0) {
             writeByte(v.toInt() or 0x80)
         } else {
             writeByte(v.toInt())
@@ -42,7 +42,7 @@ fun ByteBuf.writeVarLong(value: Long) {
     var v = value
 
     do {
-        if(v > 0x7f) {
+        if(java.lang.Long.compareUnsigned(v, 0x7f) > 0) {
             writeByte(v.toInt() or 0x80)
         } else {
             writeByte(v.toInt())

@@ -38,6 +38,7 @@ class ServerSender(
             client?.let {
                 sendMetrics(it)
             }
+            queue.clear()
         }, sendInterval.toLong(), sendInterval.toLong(), TimeUnit.MILLISECONDS)
     }
 
@@ -47,11 +48,8 @@ class ServerSender(
 
     private fun sendMetrics(client: BinaryClient) {
         val metrics = ArrayList<MetricPacket>()
-        val iterator = queue.iterator()
-
-        iterator.forEach {
+        queue.forEach {
             metrics.add(it)
-            iterator.remove()
         }
 
         client.serverMetric(metrics, serverName) { r, e ->

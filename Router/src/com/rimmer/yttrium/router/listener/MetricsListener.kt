@@ -8,7 +8,6 @@ import com.rimmer.yttrium.UnauthorizedException
 import com.rimmer.yttrium.router.Route
 import com.rimmer.yttrium.router.RouteContext
 import io.netty.channel.EventLoop
-import java.io.PrintStream
 import java.io.PrintWriter
 import java.io.StringWriter
 
@@ -41,15 +40,18 @@ class MetricsListener(val metrics: Metrics, val category: String, val next: Rout
         val writer = StringWriter()
         reason?.printStackTrace(PrintWriter(writer))
 
-        if(data is Metrics.Call) {
+        val nextData = if(data is Metrics.Call) {
             metrics.failCall(data, wasError, text, writer.toString())
+            null
         } else if(data is Pair<*, *>) {
             (data.first as? Metrics.Path)?.let {
                 metrics.failPath(it, wasError, text, writer.toString())
             }
-            next?.onFail(route, reason, data.second)
+            data.second
         } else {
-            next?.onFail(route, reason, null)
+            null
         }
+
+        next?.onFail(route, reason, nextData)
     }
 }
