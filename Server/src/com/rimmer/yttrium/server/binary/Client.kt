@@ -3,7 +3,8 @@ package com.rimmer.yttrium.server.binary
 import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.UnauthorizedException
-import com.rimmer.yttrium.serialize.*
+import com.rimmer.yttrium.serialize.readString
+import com.rimmer.yttrium.serialize.writeVarInt
 import com.rimmer.yttrium.server.connect
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
@@ -135,6 +136,8 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
     }
 
     private fun performRequest(r: Request<in Any>, route: Int, writeArgs: ByteBuf.() -> Unit): Int {
+        if(pendingCount == 0) lastResponse = System.currentTimeMillis()
+
         val id = addRequest(r)
         writePacket(context!!, id) { target, commit ->
             target.writeVarInt(route)
