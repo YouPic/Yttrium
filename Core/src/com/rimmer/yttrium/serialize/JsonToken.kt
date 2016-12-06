@@ -5,6 +5,8 @@ import com.rimmer.yttrium.InvalidStateException
 import com.rimmer.yttrium.emptyString
 import com.rimmer.yttrium.utf8
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
+import java.util.*
 
 /** Represents a json token with parsing functionality. */
 class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
@@ -25,6 +27,8 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
     var numberPayload = 0.0
     var stringPayload = ""
     var byteStringPayload = emptyString
+
+    val bufferPayload: ByteBuf get() = Unpooled.wrappedBuffer(Base64.getDecoder().decode(stringPayload))
 
     fun expect(type: Type, allowNull: Boolean = false) {
         parse()

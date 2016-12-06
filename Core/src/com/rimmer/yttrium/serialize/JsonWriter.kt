@@ -1,10 +1,9 @@
 package com.rimmer.yttrium.serialize
 
-import com.rimmer.yttrium.ByteString
-import com.rimmer.yttrium.ByteStringBuilder
-import com.rimmer.yttrium.utf8
+import com.rimmer.yttrium.*
 import io.netty.buffer.ByteBuf
 import org.joda.time.DateTime
+import java.util.*
 
 /** Utility functions for generating json data. */
 class JsonWriter(val buffer: ByteBuf) {
@@ -140,6 +139,14 @@ class JsonWriter(val buffer: ByteBuf) {
 
     fun value(i: Boolean): JsonWriter {
         buffer.writeBytes(if(i) trueBytes else falseBytes)
+        return this
+    }
+
+    fun value(i: ByteBuf): JsonWriter {
+        buffer.writeByte('"'.toInt())
+        val base64 = Base64.getEncoder().encode(i.nioBuffer())
+        buffer.writeBytes(base64)
+        buffer.writeByte('"'.toInt())
         return this
     }
 
