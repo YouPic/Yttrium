@@ -186,7 +186,7 @@ class HttpPooledClient(
         }
 
         if(body !== null) {
-            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+            if(!httpHeaders.contains(HttpHeaderNames.CONTENT_TYPE) && contentType != null) {
                 httpHeaders[HttpHeaderNames.CONTENT_TYPE] = contentType
             }
 
