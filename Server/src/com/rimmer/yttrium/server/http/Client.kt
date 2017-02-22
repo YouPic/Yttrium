@@ -121,8 +121,9 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     private var result: HttpResult? = null
     private var requestStart = 0L
     private var requestEnd = System.nanoTime()
+    private var queueClose = false
 
-    override val connected: Boolean get() = context != null && context!!.channel().isActive
+    override val connected: Boolean get() = !queueClose && context != null && context!!.channel().isActive
     override val busy: Boolean get() = listener != null
 
     override val busyTime: Long
@@ -161,6 +162,10 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
             val result = HttpResult(message.status(), message.status().code(), message.headers())
             this.result = result
             listener?.onResult(result)
+
+            if(result.headers.get(HttpHeaderNames.CONNECTION)?.toLowerCase() == "close") {
+                queueClose = true
+            }
         } else if(message is HttpContent) {
             val result = result!!
             val finished = if(message is LastHttpContent) {
@@ -174,6 +179,8 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
 
             listener?.onContent(result, message.content(), finished)
             message.content().release()
+
+            if(finished && queueClose) doClose()
         }
     }
 
@@ -319,11 +326,16 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     }
 
     override fun close() {
+        doClose()
+    }
+
+    private fun doClose() {
         if(ssl == null) {
             context?.close()
         } else {
             ssl.close().addListener {context?.close()}
         }
+        this.context = null
     }
 
     private fun onRequest(listener: HttpListener) {

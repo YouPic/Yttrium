@@ -106,13 +106,20 @@ class SingleThreadPool(
 
     override fun release(client: HttpClient) {
         if(client is PooledClient) {
-            // If anyone is currently waiting for a connection, we directly call it.
-            // Otherwise we return the connection to the pool.
             val waiter = waiting.poll()
-            if(waiter == null) {
-                idlePool.add(client)
+            if(client.busy || !client.connected || client.idleTime > config.maxIdleTime) {
+                client.connection.close()
+                connections.remove(client)
+                connectionCount--
+                if(waiter != null) get(waiter)
             } else {
-                waiter(client, null)
+                // If anyone is currently waiting for a connection, we directly call it.
+                // Otherwise we return the connection to the pool.
+                if(waiter == null) {
+                    idlePool.add(client)
+                } else {
+                    waiter(client, null)
+                }
             }
         }
     }
