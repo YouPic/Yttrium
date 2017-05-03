@@ -1,11 +1,11 @@
 package com.rimmer.yttrium.server.http
 
-import com.rimmer.yttrium.HttpException
-import com.rimmer.yttrium.InvalidStateException
-import com.rimmer.yttrium.NotFoundException
-import com.rimmer.yttrium.UnauthorizedException
+import com.rimmer.yttrium.*
 import com.rimmer.yttrium.router.HttpMethod
+import com.rimmer.yttrium.router.Route
 import com.rimmer.yttrium.serialize.JsonWriter
+import com.rimmer.yttrium.serialize.writeJson
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
@@ -34,21 +34,55 @@ fun convertMethod(method: NettyMethod) = when(method.name()) {
 }
 
 /** Converts an exception type into an error response. */
-fun mapError(error: Throwable?) = when(error) {
-    is InvalidStateException -> errorResponse(HttpResponseStatus.BAD_REQUEST, error.message ?: "bad request")
-    is UnauthorizedException -> errorResponse(HttpResponseStatus.FORBIDDEN, error.message ?: "forbidden")
-    is NotFoundException -> errorResponse(HttpResponseStatus.NOT_FOUND, error.message ?: "not found")
-    is HttpException -> errorResponse(HttpResponseStatus.valueOf(error.errorCode), error.message ?: "error")
-    else -> errorResponse(HttpResponseStatus.INTERNAL_SERVER_ERROR, "internal error")
-}
+fun mapError(error: Throwable?, route: Route, headers: HttpHeaders): HttpResponse {
+    val code: HttpResponseStatus
+    val message: String
 
-/** Creates an error response with the provided error code and text. */
-fun errorResponse(error: HttpResponseStatus, text: String): HttpResponse {
-    val buffer = ByteBufAllocator.DEFAULT.buffer()
-    val json = JsonWriter(buffer)
-    json.startObject().field("error").value(text).endObject()
+    when(error) {
+        is InvalidStateException -> {
+            code = HttpResponseStatus.BAD_REQUEST
+            message = error.message ?: "bad request"
+        }
+        is UnauthorizedException -> {
+            code = HttpResponseStatus.FORBIDDEN
+            message = error.message ?: "forbidden"
+        }
+        is NotFoundException -> {
+            code = HttpResponseStatus.NOT_FOUND
+            message = error.message ?: "not found"
+        }
+        is HttpException -> {
+            code = HttpResponseStatus.valueOf(error.errorCode)
+            message = error.message ?: "error"
+        }
+        else -> {
+            code = HttpResponseStatus.INTERNAL_SERVER_ERROR
+            message = "internal error"
+        }
+    }
 
-    val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, error, buffer)
-    response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
-    return response
+    val buffer = try {
+        val response = (error as? RouteException)?.response
+        if(response is ByteBuf) {
+            response
+        } else {
+            val buffer = ByteBufAllocator.DEFAULT.buffer()
+            val json = JsonWriter(buffer)
+
+            if(response == null) {
+                json.startObject().field("error").value(message).endObject()
+            } else {
+                writeJson(response, route.writer, buffer)
+            }
+            buffer
+        }
+    } catch(e: Exception) {
+        null
+    }
+
+    if(!headers.contains(HttpHeaderNames.CONTENT_TYPE)) {
+        headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
+    }
+
+    return DefaultFullHttpResponse(HttpVersion.HTTP_1_1, code, buffer, headers, null)
 }

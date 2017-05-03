@@ -7,6 +7,7 @@ import com.rimmer.yttrium.serialize.Reader
 import com.rimmer.yttrium.serialize.Writer
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
+import io.netty.handler.codec.http.HttpHeaders
 
 /** The supported http call methods. */
 enum class HttpMethod {GET, POST, DELETE, PUT}
@@ -126,20 +127,19 @@ class RouteProperty(val name: String, val value: Any)
 /**
  * Context information that is sent to route handlers.
  * @param channel The channel this route is being executed for.
- * @param sourceIp The source ip this request originated from. This may be different from the channel ip.
  * @param eventLoop The current event loop.
  * @param route The route being executed.
- * @param pathParameters The path parameters that were sent to the route.
- * @param queryParameters The query parameters that were sent to the route.
+ * @param parameters The parsed parameters for the route handler.
  * @param listenerData Data used by the first listener.
  * @param channelPrivate If set, the channel for this context will only be used for communication with a single client.
  */
 class RouteContext(
     val channel: ChannelHandlerContext,
-    val sourceIp: String,
     eventLoop: EventLoop,
     val route: Route,
     val parameters: Array<Any?>,
     listenerData: Any?,
-    val channelPrivate: Boolean
+    val channelPrivate: Boolean,
+    val requestHeaders: HttpHeaders?,
+    val responseHeaders: HttpHeaders?
 ): Context(eventLoop, listenerData)

@@ -8,6 +8,7 @@ import com.rimmer.yttrium.serialize.BodyContent
 import com.rimmer.yttrium.serialize.JsonToken
 import com.rimmer.yttrium.serialize.readPrimitive
 import com.rimmer.yttrium.serialize.writeJson
+import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
@@ -30,8 +31,6 @@ class HttpRouter(
         // Check if the request contains a version request.
         val acceptVersion = request.headers().get(HttpHeaderNames.ACCEPT)?.let(::maybeParseInt)
         val version = acceptVersion ?: request.headers().get("API-VERSION")?.let(::maybeParseInt) ?: 0
-        val remote = request.headers().get("X-Forwarded-For") ?:
-            (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
 
         // Check if the requested http method is known.
         val method = convertMethod(request.method())
@@ -48,32 +47,20 @@ class HttpRouter(
             return
         }
 
+        // The response headers that can be edited by the route handler.
+        val responseHeaders = DefaultHttpHeaders(false)
+
         val eventLoop = context.channel().eventLoop()
         val callId = listener?.onStart(eventLoop, route) ?: 0
         val fail = {r: RouteContext, e: Throwable? ->
-            f(mapError(e))
+            f(mapError(e, route, responseHeaders))
             listener?.onFail(r, e, r.listenerData)
         }
 
         try {
             val queries = parseQuery(route, request.uri())
             parseParameters(route, parameters, queries)
-            val content = request.content()
-            val contentStart = content.readerIndex()
-            val bodyHandler = route.bodyQuery
-
-            // Parse any parameters that were provided through the request body.
-            // Only parse as form-data if the whole body isn't
-            val parseError = if(bodyHandler == null) {
-                if(request.headers()[HttpHeaderNames.CONTENT_TYPE]?.startsWith("application/json") ?: false) {
-                    parseJsonBody(route, request, queries)
-                } else if(route.bodyQuery == null) {
-                    parseBodyQuery(route, request, queries)
-                } else null
-            } else {
-                queries[bodyHandler] = BodyContent(content.readerIndex(contentStart))
-                null
-            }
+            val parseError = parseBody(request, route, queries)
 
             // Make sure all required parameters were provided, and handle optional ones.
             checkArgs(route, queries, parseError)
@@ -82,24 +69,35 @@ class HttpRouter(
             val listener = object: RouteListener {
                 override fun onStart(eventLoop: EventLoop, route: Route) = null
                 override fun onSucceed(route: RouteContext, result: Any?, data: Any?) {
-                    val buffer = context.alloc().buffer()
                     try {
-                        writeJson(result, route.route.writer, buffer)
-                        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer)
-                        response.headers().set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
+                        val buffer = if(result is ByteBuf) {
+                            result
+                        } else {
+                            val buffer = context.alloc().buffer()
+                            writeJson(result, route.route.writer, buffer)
+                            buffer
+                        }
+
+                        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer, responseHeaders, null)
+                        if(!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
+                            responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
+                        }
+
                         f(response)
                         listener?.onSucceed(route, result, route.listenerData)
-                    } catch(e: Throwable) { fail(route, e) }
+                    } catch(e: Throwable) {
+                        fail(route, e)
+                    }
                 }
                 override fun onFail(route: RouteContext, reason: Throwable?, data: Any?) {
                     fail(route, reason)
                 }
             }
 
-            route.handler(RouteContext(context, remote, eventLoop, route, queries, callId, false), listener)
+            route.handler(RouteContext(context, eventLoop, route, queries, callId, false, request.headers(), responseHeaders), listener)
         } catch(e: Throwable) {
             // We don't have the call parameters here, so we just send a route context without them.
-            fail(RouteContext(context, remote, eventLoop, route, emptyArray(), callId, false), e)
+            fail(RouteContext(context, eventLoop, route, emptyArray(), callId, false, null, null), e)
         }
     }
 }
@@ -228,7 +226,7 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
         // Parse each query parameter.
         for(q in queries) {
             // Filter out any empty query parameters.
-            if(q.length == 0) continue
+            if(q.isEmpty()) continue
 
             val separator = q.indexOf('=')
             if(separator == -1) {
@@ -258,6 +256,27 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
     }
 
     return values
+}
+
+/** Parses the content of the request body, depending on how the route is configured. */
+fun parseBody(request: FullHttpRequest, route: Route, queries: Array<Any?>): Throwable? {
+    // Parse any parameters that were provided through the request body.
+    // We parse as json if that content type is set, otherwise as form data.
+    // If there is a body handler, we whole body is sent there.
+    val content = request.content()
+    val initialIndex = content.readerIndex()
+    val bodyHandler = route.bodyQuery
+
+    if(bodyHandler == null) {
+        if(request.headers()[HttpHeaderNames.CONTENT_TYPE]?.startsWith("application/json") ?: false) {
+            return parseJsonBody(route, request, queries)
+        } else {
+            return parseBodyQuery(route, request, queries)
+        }
+    } else {
+        queries[bodyHandler] = BodyContent(content.readerIndex(initialIndex))
+        return null
+    }
 }
 
 /**

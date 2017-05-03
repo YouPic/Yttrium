@@ -50,7 +50,6 @@ class BinaryRouter(
     }
 
     override fun invoke(context: ChannelHandlerContext, source: ByteBuf, target: ByteBuf, f: () -> Unit) {
-        val remote = (context.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
         val id = source.readVarInt()
         val binaryRoute = segmentMap[id]
         if(binaryRoute == null) {
@@ -111,7 +110,7 @@ class BinaryRouter(
             }
 
             // Run the route handler.
-            val routeContext = RouteContext(context, remote, eventLoop, route, params, callData, true)
+            val routeContext = RouteContext(context, eventLoop, route, params, callData, true, null, null)
             try {
                 route.handler(routeContext, listener)
             } catch(e: Throwable) {
@@ -123,7 +122,7 @@ class BinaryRouter(
             mapError(error, target, f)
 
             // We don't have the call parameters here, so we just send a route context without them.
-            val routeContext = RouteContext(context, remote, eventLoop, route, emptyArray(), callData, true)
+            val routeContext = RouteContext(context, eventLoop, route, emptyArray(), callData, true, null, null)
             listener?.onFail(routeContext, e, callData)
         }
     }
