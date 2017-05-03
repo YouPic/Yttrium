@@ -3,10 +3,7 @@ package com.rimmer.yttrium.router.plugin
 import com.rimmer.yttrium.router.RouteContext
 import com.rimmer.yttrium.router.RouteModifier
 import com.rimmer.yttrium.router.RouteProperty
-import java.lang.reflect.Type
 import java.net.InetSocketAddress
-import java.net.SocketAddress
-import kotlin.reflect.KParameter
 
 /** Functions that have a parameter of this type will receive the id-address of the caller. */
 class IPAddress(val ip: String)
@@ -21,7 +18,10 @@ class AddressPlugin: Plugin<Int> {
     }
 
     override fun modifyCall(context: Int, route: RouteContext, f: (Throwable?) -> Unit) {
-        route.parameters[context] = IPAddress(route.sourceIp)
+        val remote = route.requestHeaders?.get("X-Forwarded-For") ?:
+            (route.channel.channel().remoteAddress() as? InetSocketAddress)?.hostName ?: ""
+
+        route.parameters[context] = IPAddress(remote)
         f(null)
     }
 }
