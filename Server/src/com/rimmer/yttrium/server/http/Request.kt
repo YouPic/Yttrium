@@ -84,5 +84,5 @@ fun mapError(error: Throwable?, route: Route, headers: HttpHeaders): HttpRespons
         headers.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
     }
 
-    return DefaultFullHttpResponse(HttpVersion.HTTP_1_1, code, buffer, headers, null)
+    return DefaultFullHttpResponse(HttpVersion.HTTP_1_1, code, buffer, headers, DefaultHttpHeaders(false))
 }

@@ -78,7 +78,7 @@ class HttpRouter(
                             buffer
                         }
 
-                        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer, responseHeaders, null)
+                        val response = DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, buffer, responseHeaders, DefaultHttpHeaders(false))
                         if(!responseHeaders.contains(HttpHeaderNames.CONTENT_TYPE)) {
                             responseHeaders.set(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.APPLICATION_JSON)
                         }
