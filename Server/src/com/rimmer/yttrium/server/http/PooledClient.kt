@@ -78,28 +78,28 @@ class HttpPooledClient(
             throw IllegalArgumentException("Invalid context event loop - the event loop must be in the server's handlerGroup.")
 
         val split = url.split("://")
-        val domain: String
-        val path: String
         val isSsl: Boolean
 
-        if(split.size > 1) {
+        val index = if(split.size > 1) {
             isSsl = split[0] == "https"
-            domain = split[1].substringBefore('/')
-            path = split[1].substring(domain.length)
+            1
         } else {
             isSsl = false
-            domain = split[0].substringBefore('/')
-            path = split[0].substring(domain.length)
+            0
         }
 
+        val domain = split[index].substringBefore('/')
+        val path = split[index].substring(domain.length)
+
         val portString = domain.substringAfter(':', "")
+        val host = if(portString.isEmpty()) domain else domain.substringBefore(':')
         val port = if(portString.isNotEmpty()) parseInt(portString) else if(isSsl) 443 else 80
 
         val selector = "$domain $isSsl"
 
-        val request = genRequest(path, domain, method, headers, body, contentType)
+        val request = genRequest(path, host, method, headers, body, contentType)
         val client = pool.getOrAdd(selector) { SingleThreadPool(PoolConfiguration(4, maxIdle, maxBusy, debug = debug)) {
-            connectHttp(loop, domain, port, isSsl, 30000, useNative, it)
+            connectHttp(loop, host, port, isSsl, 30000, useNative, it)
         } }
 
         val task = Task<HttpResult>()
@@ -140,7 +140,7 @@ class HttpPooledClient(
                             client.get { c, e ->
                                 if(e == null) {
                                     connection = c!!
-                                    val req = genRequest(path, domain, method, headers, body, contentType)
+                                    val req = genRequest(path, host, method, headers, body, contentType)
                                     connection.request(req, body, this)
                                 } else {
                                     if(body is ByteBuf) body.release(body.refCnt())
