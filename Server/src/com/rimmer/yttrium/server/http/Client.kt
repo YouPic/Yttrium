@@ -152,6 +152,7 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
     override fun channelInactive(context: ChannelHandlerContext) {
         // Fail any pending request.
         val error = IOException("Connection was closed.")
+        queueClose = true
         listener?.onError(error)
         listener = null
     }
