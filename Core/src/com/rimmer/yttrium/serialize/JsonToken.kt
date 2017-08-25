@@ -86,6 +86,7 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
             parseValue(b.toChar())
         }
 
+        skipWhitespace()
         if(buffer.isReadable) {
             val c = buffer.getByte(buffer.readerIndex()).toChar()
             if (c == ',') {
