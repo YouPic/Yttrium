@@ -59,14 +59,9 @@
             <artifactId>kotlin-reflect</artifactId>
             <version>${kotlin.version}</version>
         </dependency>
-        <dependency>
-            <groupId>joda-time</groupId>
-            <artifactId>joda-time</artifactId>
-            <version>2.9.1</version>
-        </dependency>
     </dependencies>
 
     <properties>
-		<kotlin.version>1.0.3</kotlin.version>
+		<kotlin.version>1.1.60</kotlin.version>
     </properties>
 </project>

@@ -17,14 +17,12 @@ import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.multipart.DiskAttribute
 import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder
 import io.netty.handler.codec.http.multipart.MemoryAttribute
-import io.netty.handler.codec.http.multipart.MixedAttribute
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SslHandler
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream
 
 class HttpResult(val status: HttpResponseStatus, val statusCode: Int, val headers: HttpHeaders)
 
@@ -187,6 +185,7 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
 
     override fun request(request: HttpRequest, body: Any?, listener: HttpListener) {
         onRequest(listener)
+        val context = context!!
         val contentLength: Int
 
         val content = when(body) {
@@ -252,7 +251,7 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
                     encoder.addBodyHttpData(attribute)
                 }
 
-                context!!.writeAndFlush(encoder.finalizeRequest(), context!!.voidPromise())
+                context.writeAndFlush(encoder.finalizeRequest(), context.voidPromise())
                 return
             }
             else -> {
@@ -265,15 +264,15 @@ class HttpClientHandler(var onConnect: ((HttpClient?, Throwable?) -> Unit)?, val
             request.headers()[HttpHeaderNames.CONTENT_LENGTH] = contentLength
         }
 
-        if(body === null) {
-            context!!.writeAndFlush(request, context!!.voidPromise())
+        if(body == null) {
+            context.writeAndFlush(request, context.voidPromise())
         } else if(content is LastHttpContent) {
-            context!!.write(request, context!!.voidPromise())
-            context!!.writeAndFlush(content, context!!.voidPromise())
+            context.write(request, context.voidPromise())
+            context.writeAndFlush(content, context.voidPromise())
         } else {
-            context!!.write(request, context!!.voidPromise())
-            context!!.write(content, context!!.voidPromise())
-            context!!.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, context!!.voidPromise())
+            context.write(request, context.voidPromise())
+            context.write(content, context.voidPromise())
+            context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT, context.voidPromise())
         }
     }
 

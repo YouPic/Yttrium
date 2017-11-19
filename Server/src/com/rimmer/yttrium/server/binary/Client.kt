@@ -153,13 +153,13 @@ class BinaryClientHandler(val onConnect: (BinaryClient?, Throwable?) -> Unit): B
         if(i >= requests.size) {
             requests.add(r)
             nextRequest++
-            return i
         } else {
             requests[i] = r
             val next = requests.indexOfFirst { it == null }
             nextRequest = if(next == -1) requests.size else next
-            return i
         }
+
+        return i
     }
 
     private fun finishRequest(request: Int) {

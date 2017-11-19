@@ -107,7 +107,7 @@ inline fun ByteBuf.readArray(onValue: (index: Long, type: Int) -> Unit) {
     val header = readVarLong()
     val type = header.toInt() and 0b111
     val length = header shr 3
-    for(i in 0..length - 1) {
+    for(i in 0 until length) {
         onValue(i, type)
     }
 }
@@ -122,12 +122,12 @@ fun ByteBuf.skipField(type: Int) {
             val length = readVarInt()
             skipBytes(length)
         }
-        FieldType.Object -> mapObject {id, type -> skipField(type)}
-        FieldType.Map -> readMap {i, from, to ->
+        FieldType.Object -> mapObject { _, type -> skipField(type)}
+        FieldType.Map -> readMap { _, from, to ->
             skipField(from)
             skipField(to)
         }
-        FieldType.Array -> readArray { i, type ->
+        FieldType.Array -> readArray { _, type ->
             skipField(type)
         }
     }

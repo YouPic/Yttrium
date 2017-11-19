@@ -7,7 +7,6 @@ import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.NotFoundException
 import com.rimmer.yttrium.Task
 import com.rimmer.yttrium.finished
-import com.rimmer.yttrium.mysql.SQLPool
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -19,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger
 /** Makes sure that the query contains at least one result and returns it. */
 inline fun <T> Query.value(pool: SQLPool, context: Context, crossinline format: (Row) -> T) = map(pool, context) {
     val r = it.result
-    if(r == null || r.data.size <= 0) throw NotFoundException()
+    if(r == null || r.data.isEmpty()) throw NotFoundException()
     format(r.data[0])
 }
 
@@ -47,7 +46,7 @@ inline fun <T> Query.valueOrElse(pool: SQLPool, context: Context, crossinline fo
     run(pool[context], context.listenerData) { r, e ->
         if(e == null) {
             val result = r!!.result
-            if(result == null || result.data.size <= 0) {
+            if(result == null || result.data.isEmpty()) {
                 val task = otherwise()
                 task.handler = { r, e ->
                     if(e == null) {

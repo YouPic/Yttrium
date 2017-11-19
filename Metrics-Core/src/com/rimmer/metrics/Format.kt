@@ -7,14 +7,11 @@ fun formatMetric(value: Long, unit: MetricUnit): String {
         MetricUnit.CountUnit -> value.toString()
         MetricUnit.TimeUnit -> "${metricDecimals(value / 1000000.0, 2)} ms"
         MetricUnit.ByteUnit -> {
-            if(value < 1024) {
-                "$value B"
-            } else if(value < 1024 * 1024) {
-                "${metricDecimals(value / 1024.0, 1)} KB"
-            } else if(value < 1024 * 1024 * 1024) {
-                "${metricDecimals(value / (1024.0 * 1024.0), 1)} MB"
-            } else {
-                "${metricDecimals(value / (1024.0 * 1024.0 * 1024.0), 1)} GB"
+            when {
+                value < 1024 -> "$value B"
+                value < 1024 * 1024 -> "${metricDecimals(value / 1024.0, 1)} KB"
+                value < 1024 * 1024 * 1024 -> "${metricDecimals(value / (1024.0 * 1024.0), 1)} MB"
+                else -> "${metricDecimals(value / (1024.0 * 1024.0 * 1024.0), 1)} GB"
             }
         }
         MetricUnit.FractionUnit -> "${metricDecimals(value / 10000.0, 1)}%"

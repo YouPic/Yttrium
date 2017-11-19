@@ -14,7 +14,6 @@ import io.netty.channel.EventLoop
 import io.netty.handler.codec.http.*
 import io.netty.handler.codec.http.multipart.HttpData
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder
-import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.util.*
 
@@ -144,7 +143,7 @@ private fun buildSegments(routes: Iterable<Route>, segmentIndex: Int = 0): HttpS
     val wildcardRoutes = routes.filter {
         it.segments.size > segmentIndex + 1 && it.segments[segmentIndex].arg !== null
     }
-    val wildcards = if(wildcardRoutes.size > 0) buildSegments(wildcardRoutes, segmentIndex + 1) else null
+    val wildcards = if(wildcardRoutes.isNotEmpty()) buildSegments(wildcardRoutes, segmentIndex + 1) else null
 
     return HttpSegment(endPoints, hashes, wildcardEndpoints, next, nextHashes, wildcards)
 }
@@ -243,10 +242,12 @@ private fun parseQuery(route: Route, url: String): Array<Any?> {
                         try {
                             values[i] = readPrimitive(string, query.type)
                         } catch(e: Throwable) {
+                            val reader = query.reader
+
                             // Also try to parse as url-encoded json.
-                            if (query.reader !== null) {
+                            if(reader !== null) {
                                 val json = JsonToken(string.byteBuf)
-                                values[i] = query.reader.fromJson(json)
+                                values[i] = reader.fromJson(json)
                             } else throw e
                         }
                     }
@@ -267,15 +268,15 @@ fun parseBody(request: FullHttpRequest, route: Route, queries: Array<Any?>): Thr
     val initialIndex = content.readerIndex()
     val bodyHandler = route.bodyQuery
 
-    if(bodyHandler == null) {
-        if(request.headers()[HttpHeaderNames.CONTENT_TYPE]?.startsWith("application/json") ?: false) {
-            return parseJsonBody(route, request, queries)
+    return if(bodyHandler == null) {
+        if(request.headers()[HttpHeaderNames.CONTENT_TYPE]?.startsWith("application/json") == true) {
+            parseJsonBody(route, request, queries)
         } else {
-            return parseBodyQuery(route, request, queries)
+            parseBodyQuery(route, request, queries)
         }
     } else {
         queries[bodyHandler] = BodyContent(content.readerIndex(initialIndex))
-        return null
+        null
     }
 }
 

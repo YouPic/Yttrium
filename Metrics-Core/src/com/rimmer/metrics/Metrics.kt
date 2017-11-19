@@ -5,7 +5,6 @@ import com.rimmer.yttrium.getOrAdd
 import org.joda.time.DateTime
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicLongArray
 import kotlin.concurrent.getOrSet
 
@@ -73,19 +72,19 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
      */
     @Synchronized fun registerStat(category: String, type: Accumulator, scope: Scope, unit: MetricUnit = MetricUnit.CountUnit): Int {
         val currentIndex = statNames.indexOf(category)
-        if(currentIndex < 0) {
-            val index = statCount++
-            if(index >= statNames.size) throw IllegalStateException("Too many statistic types.")
+        return when {
+            currentIndex < 0 -> {
+                val index = statCount++
+                if(index >= statNames.size) throw IllegalStateException("Too many statistic types.")
 
-            statNames[index] = category
-            statTypes[index] = type.ordinal.toByte()
-            statScopes[index] = scope.ordinal.toByte()
-            statUnits[index] = unit
-            return index
-        } else if(statTypes[currentIndex] !== type.ordinal.toByte()) {
-            throw IllegalStateException("Statistic $category already exists under a different type.")
-        } else {
-            return currentIndex
+                statNames[index] = category
+                statTypes[index] = type.ordinal.toByte()
+                statScopes[index] = scope.ordinal.toByte()
+                statUnits[index] = unit
+                index
+            }
+            statTypes[currentIndex] != type.ordinal.toByte() -> throw IllegalStateException("Statistic $category already exists under a different type.")
+            else -> currentIndex
         }
     }
 
@@ -217,7 +216,7 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
         } else if(call is Path) {
             addError(call, DateTime.now(), reason, description, false, "")
         } else if(call is Pair<*, *> && call.first is Path) {
-            addError(call.first, DateTime.now(), reason, description, false, "")
+            addError(call.first as Path, DateTime.now(), reason, description, false, "")
         } else {
             logError(category, "", reason, description, "", false)
         }
@@ -313,7 +312,7 @@ class Metrics(maxStats: Int = 64): MetricsWriter {
         // and the values themselves will at most be sent in a different batch while still being accounted for.
         sender?.let { sender ->
             val time = DateTime.now()
-            for(i in 0..statCount - 1) {
+            for(i in 0 until statCount) {
                 val category = statNames[i] ?: ""
                 val scope = statScopes[i]
 

@@ -11,9 +11,7 @@ class ByteStringBuilder {
         append(string)
     }
 
-    override fun toString(): String {
-        return String(value, 0, count)
-    }
+    override fun toString() = String(value, 0, count)
 
     private var value: ByteArray
     private var count: Int = 0
@@ -54,11 +52,11 @@ class ByteStringBuilder {
     }
 
     fun getChars(srcBegin: Int, srcEnd: Int, dst: ByteArray, dstBegin: Int) {
-        if (srcBegin < 0)
+        if(srcBegin < 0)
             throw StringIndexOutOfBoundsException(srcBegin)
-        if (srcEnd < 0 || srcEnd > count)
+        if(srcEnd < 0 || srcEnd > count)
             throw StringIndexOutOfBoundsException(srcEnd)
-        if (srcBegin > srcEnd)
+        if(srcBegin > srcEnd)
             throw StringIndexOutOfBoundsException("srcBegin > srcEnd")
         System.arraycopy(value, srcBegin, dst, dstBegin, srcEnd - srcBegin)
     }
@@ -174,13 +172,8 @@ class ByteStringBuilder {
         return this
     }
 
-    fun substring(start: Int): ByteString {
-        return substring(start, count)
-    }
-
-    fun subSequence(start: Int, end: Int): ByteString {
-        return substring(start, end)
-    }
+    fun substring(start: Int) = substring(start, count)
+    fun subSequence(start: Int, end: Int) = substring(start, end)
 
     fun substring(start: Int, end: Int): ByteString {
         if(start < 0)
@@ -207,9 +200,7 @@ class ByteStringBuilder {
         return this
     }
 
-    fun insert(offset: Int, obj: Any): ByteStringBuilder {
-        return insert(offset, obj.toString())
-    }
+    fun insert(offset: Int, obj: Any): ByteStringBuilder = insert(offset, obj.toString())
 
     fun insert(offset: Int, str: CharArray): ByteStringBuilder {
         if(offset < 0 || offset > length) throw StringIndexOutOfBoundsException(offset)
@@ -223,9 +214,7 @@ class ByteStringBuilder {
         return this
     }
 
-    fun insert(dstOffset: Int, s: ByteString): ByteStringBuilder {
-        return insert(dstOffset, s, 0, s.size)
-    }
+    fun insert(dstOffset: Int, s: ByteString): ByteStringBuilder = insert(dstOffset, s, 0, s.size)
 
     fun insert(dstOffset: Int, s: ByteString, start: Int, end: Int): ByteStringBuilder {
         var dstOffset = dstOffset
@@ -244,9 +233,7 @@ class ByteStringBuilder {
         return this
     }
 
-    fun insert(offset: Int, b: Boolean): ByteStringBuilder {
-        return insert(offset, b.toString())
-    }
+    fun insert(offset: Int, b: Boolean): ByteStringBuilder = insert(offset, b.toString())
 
     fun insert(offset: Int, c: Byte): ByteStringBuilder {
         ensureCapacity(count + 1)
@@ -257,19 +244,8 @@ class ByteStringBuilder {
         return this
     }
 
-    fun insert(offset: Int, i: Int): ByteStringBuilder {
-        return insert(offset, i.toString())
-    }
-
-    fun insert(offset: Int, l: Long): ByteStringBuilder {
-        return insert(offset, l.toString())
-    }
-
-    fun insert(offset: Int, f: Float): ByteStringBuilder {
-        return insert(offset, f.toString())
-    }
-
-    fun insert(offset: Int, d: Double): ByteStringBuilder {
-        return insert(offset, d.toString())
-    }
+    fun insert(offset: Int, i: Int) = insert(offset, i.toString())
+    fun insert(offset: Int, l: Long) = insert(offset, l.toString())
+    fun insert(offset: Int, f: Float) = insert(offset, f.toString())
+    fun insert(offset: Int, d: Double) = insert(offset, d.toString())
 }

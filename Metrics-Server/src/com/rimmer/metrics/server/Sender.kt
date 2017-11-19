@@ -23,11 +23,11 @@ class ServerSender(
     sendInterval: Int = 60 * 1000
 ): (MetricPacket) -> Unit {
     // Run the sender on a single thread to prevent internal synchronization.
-    val eventLoop: EventLoop = context.handlerGroup.next()
-    val queue = ConcurrentLinkedQueue<MetricPacket>()
+    private val eventLoop: EventLoop = context.handlerGroup.next()
+    private val queue = ConcurrentLinkedQueue<MetricPacket>()
 
-    var client: BinaryClient? = null
-    var lastTry = 0L
+    private var client: BinaryClient? = null
+    private var lastTry = 0L
 
     init {
         ensureClient()
@@ -52,10 +52,10 @@ class ServerSender(
             metrics.add(it)
         }
 
-        client.serverMetric(metrics, serverName) { r, e ->
+        client.serverMetric(metrics, serverName) { _, e ->
             // If the sending failed we discard the events,
             // as queueing too many metrics could cause spikes in server latency.
-            if(e !== null) println("Could not send event batch: $e")
+            if(e != null) println("Could not send event batch: $e")
         }
     }
 

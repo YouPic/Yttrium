@@ -6,12 +6,10 @@ import com.rimmer.yttrium.server.ServerContext
 import io.netty.buffer.ByteBuf
 import io.netty.channel.EventLoop
 import io.netty.channel.EventLoopGroup
-import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpRequest
 import java.io.IOException
 import java.util.*
-
 
 /**
  * @param maxItems The maximum number of active connections in the pool.

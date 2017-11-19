@@ -27,16 +27,14 @@ fun ByteBuf.writeVarInt(value: Int) {
     var v = value
     do {
         if(Integer.compareUnsigned(v, 0x7f) > 0) {
-            writeByte(v.toInt() or 0x80)
+            writeByte(v or 0x80)
         } else {
-            writeByte(v.toInt())
+            writeByte(v)
         }
 
         v = v ushr 7
     } while(v != 0)
 }
-
-fun ByteBuf.writeBoolean(value: Boolean) = writeVarInt(if(value) 1 else 0)
 
 fun ByteBuf.writeVarLong(value: Long) {
     var v = value

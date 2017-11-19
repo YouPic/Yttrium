@@ -40,16 +40,18 @@ class MetricsListener(val metrics: Metrics, val category: String, val next: Rout
         val writer = StringWriter()
         reason?.printStackTrace(PrintWriter(writer))
 
-        val nextData = if(data is Metrics.Call) {
-            metrics.failCall(data, wasError, text, writer.toString())
-            null
-        } else if(data is Pair<*, *>) {
-            (data.first as? Metrics.Path)?.let {
-                metrics.failPath(it, wasError, text, writer.toString())
+        val nextData = when(data) {
+            is Metrics.Call -> {
+                metrics.failCall(data, wasError, text, writer.toString())
+                null
             }
-            data.second
-        } else {
-            null
+            is Pair<*, *> -> {
+                (data.first as? Metrics.Path)?.let {
+                    metrics.failPath(it, wasError, text, writer.toString())
+                }
+                data.second
+            }
+            else -> null
         }
 
         next?.onFail(route, reason, nextData)

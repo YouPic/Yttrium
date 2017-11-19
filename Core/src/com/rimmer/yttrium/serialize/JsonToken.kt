@@ -74,16 +74,12 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
     fun parse() {
         skipWhitespace()
         val b = buffer.readByte().toInt()
-        if(b == '['.toInt()) {
-            type = Type.StartArray
-        } else if(b == ']'.toInt()) {
-            type = Type.EndArray
-        } else if(b == '{'.toInt()) {
-            type = Type.StartObject
-        } else if(b == '}'.toInt()) {
-            type = Type.EndObject
-        } else {
-            parseValue(b.toChar())
+        when (b) {
+            '['.toInt() -> type = Type.StartArray
+            ']'.toInt() -> type = Type.EndArray
+            '{'.toInt() -> type = Type.StartObject
+            '}'.toInt() -> type = Type.EndObject
+            else -> parseValue(b.toChar())
         }
 
         skipWhitespace()
@@ -130,18 +126,22 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
     }
 
     private fun skipElement() {
-        if(type === Type.StartObject) skipObject()
-        else if(type === Type.StartArray) skipArray()
-        else if(type === Type.EndObject || type === Type.EndArray)
-            throw InvalidStateException("Invalid json: Cannot have $type here.")
+        when {
+            type === Type.StartObject -> skipObject()
+            type === Type.StartArray -> skipArray()
+            type === Type.EndObject || type === Type.EndArray ->
+                throw InvalidStateException("Invalid json: Cannot have $type here.")
+        }
     }
 
     private fun skipObject() {
         while(true) {
             parse()
-            if(type === Type.EndObject) return
-            else if(type === Type.FieldName) skipValue()
-            else throw InvalidStateException("Invalid json: Expected field name, got $type")
+            when {
+                type === Type.EndObject -> return
+                type === Type.FieldName -> skipValue()
+                else -> throw InvalidStateException("Invalid json: Expected field name, got $type")
+            }
         }
     }
 
@@ -254,7 +254,7 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
                 ch = buffer.readByte().toChar()
             }
 
-            if(signNegative) exp = -exp;
+            if(signNegative) exp = -exp
 
             val power = Math.pow(10.0, exp)
             out *= power
@@ -289,24 +289,16 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
 
     private fun parseEscaped(string: ByteStringBuilder) {
         val b = buffer.readByte().toInt()
-        if(b == '"'.toInt()) {
-            string.append('"'.toByte())
-        } else if(b == '\\'.toInt()) {
-            string.append('\\'.toByte())
-        } else if(b == '/'.toInt()) {
-            string.append('/'.toByte())
-        } else if(b == 'b'.toInt()) {
-            string.append('\b'.toByte())
-        } else if(b == 'f'.toInt()) {
-            string.append(0x0C.toByte())
-        } else if(b == 'n'.toInt()) {
-            string.append('\n'.toByte())
-        } else if(b == 'r'.toInt()) {
-            string.append('\r'.toByte())
-        } else if(b == 't'.toInt()) {
-            string.append('\t'.toByte())
-        } else if(b == 'u'.toInt()) {
-            parseUnicode(string)
+        when (b) {
+            '"'.toInt() -> string.append('"'.toByte())
+            '\\'.toInt() -> string.append('\\'.toByte())
+            '/'.toInt() -> string.append('/'.toByte())
+            'b'.toInt() -> string.append('\b'.toByte())
+            'f'.toInt() -> string.append(0x0C.toByte())
+            'n'.toInt() -> string.append('\n'.toByte())
+            'r'.toInt() -> string.append('\r'.toByte())
+            't'.toInt() -> string.append('\t'.toByte())
+            'u'.toInt() -> parseUnicode(string)
         }
     }
 
@@ -343,8 +335,7 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
  * @return The parsed number. Returns Nothing if the character is not a valid number.
  */
 fun parseHexit(c: Byte): Int {
-    val ch = c
-    val index = ch - '0'.toByte()
+    val index = c - '0'.toByte()
 
     if(index < 0 || index > 54) {
         throw InvalidStateException("Invalid json: expected unicode sequence, got '$c'")
@@ -375,7 +366,6 @@ val parseHexitLookup = arrayOf(
  * Returns true if this is a digit.
  */
 fun isDigit(c: Char): Boolean {
-    val ch = c
-    val index = ch - '0'
-    return index <= 9 && index >= 0
+    val index = c - '0'
+    return index in 0..9
 }

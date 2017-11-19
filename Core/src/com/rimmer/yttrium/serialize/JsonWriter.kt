@@ -7,8 +7,8 @@ import java.util.*
 
 /** Utility functions for generating json data. */
 class JsonWriter(val buffer: ByteBuf) {
-    var depth = 0
-    var hasValue = 0
+    private var depth = 0
+    private var hasValue = 0
 
     fun startObject(): JsonWriter {
         buffer.writeByte('{'.toInt())
@@ -60,30 +60,25 @@ class JsonWriter(val buffer: ByteBuf) {
 
     fun field(name: String) = field(name.toByteArray())
 
-    fun nullValue() = buffer.writeBytes(nullBytes)
+    fun nullValue() {
+        buffer.writeBytes(nullBytes)
+    }
 
     fun value(s: String): JsonWriter {
         buffer.writeByte('"'.toInt())
         val escaped = StringBuilder(s.length)
         for(c in s) {
-            if(c == '"') {
-                escaped.append("\\\"")
-            } else if(c == '\\') {
-                escaped.append("\\\\")
-            } else if(c < 0x20.toChar()) {
-                if (c == '\b') {
-                    escaped.append("\\b")
-                } else if (c == 0x0C.toChar()) {
-                    escaped.append("\\f")
-                } else if (c == '\n') {
-                    escaped.append("\\n")
-                } else if (c == '\r') {
-                    escaped.append("\\r")
-                } else if (c == '\t') {
-                    escaped.append("\\t")
+            when {
+                c == '"' -> escaped.append("\\\"")
+                c == '\\' -> escaped.append("\\\\")
+                c < 0x20.toChar() -> when(c) {
+                    '\b' -> escaped.append("\\b")
+                    0x0C.toChar() -> escaped.append("\\f")
+                    '\n' -> escaped.append("\\n")
+                    '\r' -> escaped.append("\\r")
+                    '\t' -> escaped.append("\\t")
                 }
-            } else {
-                escaped.append(c)
+                else -> escaped.append(c)
             }
         }
         buffer.writeBytes(escaped.toString().toByteArray())
@@ -95,24 +90,17 @@ class JsonWriter(val buffer: ByteBuf) {
         buffer.writeByte('"'.toInt())
         val escaped = ByteStringBuilder(s.size)
         for(c in s) {
-            if(c == '"'.toByte()) {
-                escaped.append("\\\"".utf8)
-            } else if(c == '\\'.toByte()) {
-                escaped.append("\\\\".utf8)
-            } else if(c < 0x20.toByte()) {
-                if (c == '\b'.toByte()) {
-                    escaped.append("\\b".utf8)
-                } else if (c == 0x0C.toByte()) {
-                    escaped.append("\\f".utf8)
-                } else if (c == '\n'.toByte()) {
-                    escaped.append("\\n".utf8)
-                } else if (c == '\r'.toByte()) {
-                    escaped.append("\\r".utf8)
-                } else if (c == '\t'.toByte()) {
-                    escaped.append("\\t".utf8)
+            when {
+                c == '"'.toByte() -> escaped.append("\\\"".utf8)
+                c == '\\'.toByte() -> escaped.append("\\\\".utf8)
+                c < 0x20.toByte() -> when(c) {
+                    '\b'.toByte() -> escaped.append("\\b".utf8)
+                    0x0C.toByte() -> escaped.append("\\f".utf8)
+                    '\n'.toByte() -> escaped.append("\\n".utf8)
+                    '\r'.toByte() -> escaped.append("\\r".utf8)
+                    '\t'.toByte() -> escaped.append("\\t".utf8)
                 }
-            } else {
-                escaped.append(c)
+                else -> escaped.append(c)
             }
         }
 

@@ -54,7 +54,7 @@ class Task<T> {
 
     /** Call the provided handler when finished. */
     inline fun onFinish(crossinline f: (T) -> Unit) {
-        handler = {r, e ->
+        handler = {r, _ ->
             try {
                 r?.let(f)
             } catch(e: Throwable) {
@@ -65,7 +65,7 @@ class Task<T> {
 
     /** Call the provided handler when failed. */
     inline fun onFail(crossinline f: (Throwable) -> Unit) {
-        handler = {r, e ->
+        handler = {_, e ->
             try {
                 e?.let(f)
             } catch(e: Throwable) {

@@ -22,6 +22,7 @@ interface Writable {
 class Writer<in T>(val toJson: JsonWriter.(T) -> Unit, val toBinary: ByteBuf.(T) -> Unit, val type: Int)
 class Reader(val target: Class<*>, val fromJson: (JsonToken) -> Any, val fromBinary: (ByteBuf) -> Any)
 
+// Writers for default types.
 val intWriter = Writer<Int>({ value(it) }, { writeVarInt(it) }, FieldType.VarInt)
 val longWriter = Writer<Long>({ value(it) }, { writeVarLong(it) }, FieldType.VarInt)
 val byteStringWriter = Writer<ByteString>({ value(it) }, { writeByteString(it) }, FieldType.LengthEncoded)
@@ -99,9 +100,7 @@ fun <V> mapWriter(writer: Writer<V>?) = if(writer == null) {
 }
 
 
-
-
-
+// Readers for default types.
 val intReader = Reader(Int::class.javaObjectType, {
     it.expect(JsonToken.Type.NumberLit)
     it.numberPayload.toInt()
@@ -185,12 +184,10 @@ val byteStringReader = Reader(ByteString::class.java, {
 
 val dateTimeReader = Reader(DateTime::class.java, {
     it.parse()
-    if(it.type == JsonToken.Type.NumberLit) {
-        DateTime(it.numberPayload.toLong(), DateTimeZone.UTC)
-    } else if(it.type == JsonToken.Type.StringLit) {
-        DateTime.parse(it.stringPayload)
-    } else {
-        throw InvalidStateException("Expected a json date.")
+    when(it.type) {
+        JsonToken.Type.NumberLit -> DateTime(it.numberPayload.toLong(), DateTimeZone.UTC)
+        JsonToken.Type.StringLit -> DateTime.parse(it.stringPayload)
+        else -> throw InvalidStateException("Expected a json date.")
     }
 }, {
     DateTime(it.readVarLong(), DateTimeZone.UTC)
@@ -198,12 +195,10 @@ val dateTimeReader = Reader(DateTime::class.java, {
 
 val dateReader = Reader(Date::class.java, {
     it.parse()
-    if(it.type == JsonToken.Type.NumberLit) {
-        Date(it.numberPayload.toLong())
-    } else if(it.type == JsonToken.Type.StringLit) {
-        Date(DateTime.parse(it.stringPayload).millis)
-    } else {
-        throw InvalidStateException("Expected a json date.")
+    when(it.type) {
+        JsonToken.Type.NumberLit -> Date(it.numberPayload.toLong())
+        JsonToken.Type.StringLit -> Date(DateTime.parse(it.stringPayload).millis)
+        else -> throw InvalidStateException("Expected a json date.")
     }
 }, {
     Date(it.readVarLong())
@@ -311,24 +306,25 @@ data class BodyContent(val value: ByteBuf) {
 
 fun writeJson(value: Any?, writer: Writer<*>?, target: ByteBuf) {
     val json = JsonWriter(target)
-    if(writer === null) {
-        if(value is Writable) value.encodeJson(json)
-        else if(value is Unit) {
-            json.startObject()
-            json.endObject()
-        } else throw IllegalStateException("Value $value is not serializable.")
-    } else if(value !== null) {
-        (writer as Writer<Any>).toJson(json, value)
-    } else {
-        json.nullValue()
+    when {
+        writer == null -> when(value) {
+            is Writable -> value.encodeJson(json)
+            is Unit -> {
+                json.startObject()
+                json.endObject()
+            }
+            else -> throw IllegalStateException("Value $value is not serializable.")
+        }
+        value != null -> (writer as Writer<Any>).toJson(json, value)
+        else -> json.nullValue()
     }
 }
 
 fun writeBinary(value: Any?, writer: Writer<*>?, target: ByteBuf) {
-    if(writer === null) {
+    if(writer == null) {
         if(value is Writable) value.encodeBinary(target)
         else if(value !is Unit) throw IllegalStateException("Value $value is not serializable.")
-    } else if(value !== null) {
+    } else if(value != null) {
         (writer as Writer<Any>).toBinary(target, value)
     }
 }
@@ -357,9 +353,11 @@ fun readPrimitive(source: String, target: Class<*>): Any {
             it.name == source
         } ?: throw InvalidStateException("\"$source\" is not an instance of enum $target")
     } else if(target == Boolean::class.javaObjectType || target == Boolean::class.javaPrimitiveType) {
-        if(source == "true") return true
-        else if(source == "false") return false
-        else throw InvalidStateException("\"$source\" is not a boolean")
+        return when (source) {
+            "true" -> true
+            "false" -> false
+            else -> throw InvalidStateException("\"$source\" is not a boolean")
+        }
     } else if(target == Float::class.javaObjectType || target == Float::class.javaPrimitiveType) {
         try {
             return java.lang.Float.parseFloat(source)

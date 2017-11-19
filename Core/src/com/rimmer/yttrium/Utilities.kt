@@ -19,24 +19,20 @@ fun String.sliceHash(start: Int, end: Int): Int {
 }
 
 /** Tries to parse a Long from a string. Returns null on failure. */
-fun maybeParseLong(text: String): Long? {
-    try {
-        return java.lang.Long.parseLong(text)
-    } catch(e: NumberFormatException) {
-        return null
-    }
+fun maybeParseLong(text: String) = try {
+    java.lang.Long.parseLong(text)
+} catch(e: NumberFormatException) {
+    null
 }
 
 /** Tries to parse a Long from a string. Returns the provided default on failure. */
 fun parseLong(text: String, otherwise: Long = 0L) = maybeParseLong(text) ?: otherwise
 
 /** Tries to parse an Int from a string. Returns null on failure. */
-fun maybeParseInt(text: String): Int? {
-    try {
-        return java.lang.Integer.parseInt(text)
-    } catch(e: NumberFormatException) {
-        return null
-    }
+fun maybeParseInt(text: String) = try {
+    java.lang.Integer.parseInt(text)
+} catch(e: NumberFormatException) {
+    null
 }
 
 /** Tries to parse an Int from a string. Returns the provided default on failure. */
@@ -72,10 +68,9 @@ val String.byteBuf: ByteBuf get() = Unpooled.wrappedBuffer(toByteArray(Charsets.
 /** Retrieves a value from this map, or adds a new one if it doesn't exist. */
 inline fun <K, V> MutableMap<K, V>.getOrAdd(key: K, create: () -> V): V {
     val existing = this[key]
-    val value = if(existing == null) {
+    return if(existing == null) {
         val it = create()
         this[key] = it
         it
     } else existing
-    return value
 }

@@ -27,7 +27,7 @@ interface ByteString: List<Byte> {
 class LocalByteString(private val bytes: ByteArray): ByteString {
     override fun hashCode(): Int {
         var h = 0
-        if(bytes.size > 0) {
+        if(bytes.isNotEmpty()) {
             for(b in bytes) {
                 h = 31 * h + b
             }
@@ -40,7 +40,7 @@ class LocalByteString(private val bytes: ByteArray): ByteString {
             return true
         }
         if(other is ByteString && bytes.size == other.size) {
-            for(i in 0..bytes.size-1) {
+            for(i in 0 until bytes.size) {
                 if(bytes[i] != other[i]) return false
             }
             return true
@@ -51,12 +51,7 @@ class LocalByteString(private val bytes: ByteArray): ByteString {
     override val size: Int get() = bytes.size
 
     override fun contains(element: Byte) = bytes.contains(element)
-    override fun containsAll(elements: Collection<Byte>): Boolean {
-        for(e in elements) {
-            if(e !in bytes) return false
-        }
-        return true
-    }
+    override fun containsAll(elements: Collection<Byte>) = elements.all { it in bytes }
 
     override fun get(index: Int) = bytes[index]
     override fun indexOf(element: Byte) = bytes.indexOf(element)
@@ -67,9 +62,9 @@ class LocalByteString(private val bytes: ByteArray): ByteString {
     override fun subList(fromIndex: Int, toIndex: Int) = LocalByteString(bytes.copyOfRange(fromIndex, toIndex))
     override fun write(buffer: ByteBuf) {buffer.writeBytes(bytes)}
     override fun utf16() = String(bytes, Charsets.UTF_8)
-    override fun slice(start: Int, end: Int) = LocalByteString(bytes.sliceArray(start..end - 1))
+    override fun slice(start: Int, end: Int) = LocalByteString(bytes.sliceArray(start until end))
 
-    class Iterator(val bytes: ByteArray, var index: Int = 0): ListIterator<Byte> {
+    class Iterator(private val bytes: ByteArray, var index: Int = 0): ListIterator<Byte> {
         override fun hasNext() = index < bytes.size
         override fun hasPrevious() = index >= 0
         override fun nextIndex() = index + 1
@@ -91,10 +86,9 @@ class LocalByteString(private val bytes: ByteArray): ByteString {
 
 /** Contains a byte string in native memory, without copying. */
 class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString {
-    private val buffer: ByteBuffer
+    private val buffer = source.slice()
 
     init {
-        buffer = source.slice()
         buffer.position(offset).limit(offset + count)
     }
 
@@ -111,7 +105,7 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
             return true
         }
         if(other is ByteString && size == other.size) {
-            for(i in 0..size-1) {
+            for(i in 0 until size) {
                 if(this[i] != other[i]) return false
             }
             return true
@@ -135,12 +129,7 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
         return false
     }
 
-    override fun containsAll(elements: Collection<Byte>): Boolean {
-        for(e in elements) {
-            if(e !in this) return false
-        }
-        return true
-    }
+    override fun containsAll(elements: Collection<Byte>) = elements.all { it in this }
 
     override fun indexOf(element: Byte): Int {
         val start = buffer.position()
@@ -179,13 +168,13 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
 
     override fun utf16(): String {
         val string = ByteArray(size)
-        for(i in 0..size-1) {
+        for(i in 0 until size) {
             string[i] = this[i]
         }
         return String(string, Charsets.UTF_8)
     }
 
-    class It(val bytes: ByteBuffer, var index: Int, val max: Int): Iterator<Byte> {
+    class It(private val bytes: ByteBuffer, var index: Int, val max: Int): Iterator<Byte> {
         override fun hasNext() = index < max
         override fun next(): Byte {
             val byte = bytes[index]
@@ -194,7 +183,7 @@ class NativeByteString(source: ByteBuffer, offset: Int, count: Int): ByteString 
         }
     }
 
-    class BiIt(val bytes: ByteBuffer, var index: Int, val min: Int, val max: Int): ListIterator<Byte> {
+    class BiIt(private val bytes: ByteBuffer, var index: Int, val min: Int, val max: Int): ListIterator<Byte> {
         override fun hasNext() = index < max
         override fun hasPrevious() = index >= min
         override fun nextIndex() = index + 1

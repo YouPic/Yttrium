@@ -257,11 +257,11 @@ fun removeOldProfiles(time: DateTime, profiles: MutableList<TimeProfile>) {
     }
     val list = profiles.subList(0, i)
     list.forEach {
-        it.servers.forEach { s, server ->
-            server.forEach { s, category ->
+        it.servers.forEach { _, server ->
+            server.forEach { _, category ->
                 category.profile.profileBuilder.clear()
                 category.profile.profileBuilder.trimToSize()
-                category.paths.forEach { p, path ->
+                category.paths.forEach { _, path ->
                     path.profileBuilder.clear()
                     path.profileBuilder.trimToSize()
                 }
