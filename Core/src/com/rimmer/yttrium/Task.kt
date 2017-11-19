@@ -75,15 +75,19 @@ class Task<T> {
     }
 
     /** Maps the task through the provided function, returning a new task. */
-    inline fun <U> map(crossinline f: (T) -> U) = mapMaybe {f(it!!)}
-
-    /** Maps the task through the provided function, returning a new task. */
-    inline fun <U> mapMaybe(crossinline f: (T?) -> U): Task<U> {
+    inline fun <U> map(crossinline f: (T) -> U): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
                 try {
-                    task.finish(f(r))
+                    // This cast is needed to satisfy the type system without being able to specialize generics:
+                    // If `T` is a nullable type, `r` is either null or a value.
+                    // If `T` is not nullable type, `r` is a value.
+                    // From the compiler's perspective it could be null in the second case,
+                    // but we know that the other functions in the class won't allow sending in null here.
+                    // By using this specific cast, the compiler won't insert any explicit null checks
+                    // and so this will work correctly in both the above cases.
+                    task.finish(f(r as T))
                 } catch(e: Throwable) {
                     task.fail(e)
                 }
@@ -94,18 +98,14 @@ class Task<T> {
         return task
     }
 
-    inline fun <U> mapMaybeNull(crossinline f: (T?) -> U?) = mapMaybe(f)
-
     /** Maps the task through the provided functions, returning a new task. */
-    inline fun <U> map(crossinline succeed: (T) -> U, crossinline fail: (Throwable) -> U) = mapMaybe({succeed(it!!)}, fail)
-
-    /** Maps the task through the provided functions, returning a new task. */
-    inline fun <U> mapMaybe(crossinline succeed: (T?) -> U, crossinline fail: (Throwable) -> U): Task<U> {
+    inline fun <U> map(crossinline succeed: (T) -> U, crossinline fail: (Throwable) -> U): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
                 try {
-                    task.finish(succeed(r))
+                    // See `map(f)` for an explanation of this cast.
+                    task.finish(succeed(r as T))
                 } catch(e: Throwable) {
                     task.fail(e)
                 }
@@ -124,41 +124,16 @@ class Task<T> {
     inline fun catch(crossinline f: (Throwable) -> T) = map({it}, {f(it)})
 
     /** Runs the provided task generator on finish, returning the new task. */
-    inline fun <U> then(crossinline f: (T) -> Task<U>) = thenMaybe {f(it!!)}
-
-    /** Runs the provided task generator on finish, returning the new task. */
-    inline fun <U> thenMaybe(crossinline f: (T?) -> Task<U>): Task<U> {
+    inline fun <U> then(crossinline f: (T) -> Task<U>): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
                 try {
-                    val next = f(r)
+                    // See `map(f)` for an explanation of this cast.
+                    val next = f(r as T)
                     next.handler = {r, e ->
                         if(e == null) {
-                            task.finish(r!!)
-                        } else {
-                            task.fail(e)
-                        }
-                    }
-                } catch(e: Throwable) {
-                    task.fail(e)
-                }
-            } else {
-                task.fail(e)
-            }
-        }
-        return task
-    }
-
-    inline fun <U> thenMaybeNull(crossinline f: (T?) -> Task<U?>): Task<U?> {
-        val task = Task<U?>()
-        handler = {r, e ->
-            if(e == null) {
-                try {
-                    val next = f(r)
-                    next.handler = {r, e ->
-                        if(e == null) {
-                            task.finish(r)
+                            task.finish(r as U)
                         } else {
                             task.fail(e)
                         }
@@ -174,18 +149,16 @@ class Task<T> {
     }
 
     /** Runs the provided task generator on finish or failure, returning the new task. */
-    inline fun <U> then(crossinline succeed: (T) -> Task<U>, crossinline fail: (Throwable) -> Task<U>) = thenMaybe({succeed(it!!)}, fail)
-
-    /** Runs the provided task generator on finish or failure, returning the new task. */
-    inline fun <U> thenMaybe(crossinline succeed: (T?) -> Task<U>, crossinline fail: (Throwable) -> Task<U>): Task<U> {
+    inline fun <U> then(crossinline succeed: (T) -> Task<U>, crossinline fail: (Throwable) -> Task<U>): Task<U> {
         val task = Task<U>()
         handler = {r, e ->
             if(e == null) {
                 try {
-                    val next = succeed(r)
+                    // See `map(f)` for an explanation of this cast.
+                    val next = succeed(r as T)
                     next.handler = {r, e ->
                         if(e == null) {
-                            task.finish(r!!)
+                            task.finish(r as U)
                         } else {
                             task.fail(e)
                         }
@@ -198,7 +171,7 @@ class Task<T> {
                     val next = fail(e)
                     next.handler = { r, e ->
                         if(e == null) {
-                            task.finish(r!!)
+                            task.finish(r as U)
                         } else {
                             task.fail(e)
                         }
@@ -217,8 +190,12 @@ class Task<T> {
         handler = {r, e ->
             try {
                 f(r, e)
-                if(e === null) (task as Task<T?>).finish(r)
-                else task.fail(e)
+                if(e === null) {
+                    // See `map(f)` for an explanation of this cast.
+                    task.finish(r as T)
+                } else {
+                    task.fail(e)
+                }
             } catch(e: Throwable) {
                 task.fail(e)
             }
