@@ -1,18 +1,20 @@
 package com.rimmer.metrics.server
 
-import com.rimmer.metrics.generated.type.*
 import com.rimmer.metrics.generated.type.ErrorPacket
+import com.rimmer.metrics.generated.type.MetricUnit
+import com.rimmer.metrics.generated.type.ProfilePacket
+import com.rimmer.metrics.generated.type.StatPacket
 import com.rimmer.metrics.server.generated.type.*
-import com.rimmer.metrics.server.generated.type.TimeMetric as TimeMetricResponse
-import com.rimmer.metrics.server.generated.type.ServerMetric as ServerMetricResponse
-import com.rimmer.metrics.server.generated.type.CategoryMetric as CategoryMetricResponse
-import com.rimmer.metrics.server.generated.type.Metric as MetricResponse
-import com.rimmer.metrics.server.generated.type.TimeProfile as TimeProfileResponse
-import com.rimmer.metrics.server.generated.type.CategoryProfile as CategoryProfileResponse
-import com.rimmer.metrics.server.generated.type.ErrorClass as ErrorClassResponse
 import com.rimmer.yttrium.getOrAdd
 import org.joda.time.DateTime
 import java.util.*
+import com.rimmer.metrics.server.generated.type.CategoryMetric as CategoryMetricResponse
+import com.rimmer.metrics.server.generated.type.CategoryProfile as CategoryProfileResponse
+import com.rimmer.metrics.server.generated.type.ErrorClass as ErrorClassResponse
+import com.rimmer.metrics.server.generated.type.Metric as MetricResponse
+import com.rimmer.metrics.server.generated.type.ServerMetric as ServerMetricResponse
+import com.rimmer.metrics.server.generated.type.TimeMetric as TimeMetricResponse
+import com.rimmer.metrics.server.generated.type.TimeProfile as TimeProfileResponse
 
 fun profileEntry(it: ProfileEntry?) = ProfileEntry(it?.start ?: 0, it?.end ?: 0, it?.events?.map {
     ProfileEvent(it.group, it.event, it.startTime, it.endTime)
@@ -173,15 +175,8 @@ class MetricStore {
         println("Received stat packet with ${packet.sampleCount} samples.")
 
         val key = packet.time.millis / 60000
-        val timePoint = timeMap.getOrAdd(key) {
-            // Remove older points until we have at most one week of metrics left.
-            if(inFlightTimes.size > 7*24*60) {
-                inFlightTimes.subList(0, inFlightTimes.size - 7*24*60).clear()
-            }
-
-            val p = TimeMetric(DateTime(key * 60000))
-            inFlightTimes.add(p)
-            p
+        val timePoint = addPoint(key, 7 * 24 * 60, inFlightTimes, timeMap) {
+            TimeMetric(DateTime(key * 60000))
         }
 
         val name = remoteName(remoteName, remote)
@@ -201,15 +196,8 @@ class MetricStore {
         removeOldProfiles(packet.time, inFlightProfiles)
 
         val key = packet.time.millis / 60000
-        val timeProfile = profileMap.getOrAdd(key) {
-            // Remove older points until we have at most one day of metrics left.
-            if(inFlightProfiles.size > 24*60) {
-                inFlightProfiles.subList(0, inFlightProfiles.size - 24*60).clear()
-            }
-
-            val p = TimeProfile(DateTime(key * 60000))
-            inFlightProfiles.add(p)
-            p
+        val timeProfile = addPoint(key, 24 * 60, inFlightProfiles, profileMap) {
+            TimeProfile(DateTime(key * 60000))
         }
 
         val name = remoteName(remoteName, remote)
@@ -244,6 +232,24 @@ class MetricStore {
     }
 
     private fun remoteName(name: String, remote: String) = "$name [$remote]"
+}
+
+inline fun <T> addPoint(key: Long, maxAgeMinutes: Int, list: MutableList<T>, map: MutableMap<Long, T>, create: () -> T): T {
+    return map.getOrAdd(key) {
+        // Remove older points until we have at most one week of metrics left.
+        if(list.size > maxAgeMinutes) {
+            list.subList(0, list.size - maxAgeMinutes).clear()
+
+            val minCreated = DateTime.now().minusMinutes(maxAgeMinutes).millis / 60000
+            val remainingItems = map.filterKeys { it > minCreated }
+            map.clear()
+            map.putAll(remainingItems)
+        }
+
+        val p = create()
+        list.add(p)
+        p
+    }
 }
 
 fun isOldPoint(time: DateTime, p: TimeSlice) = time.millis - p.time.millis > 60000
