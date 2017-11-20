@@ -156,6 +156,8 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
     private fun parseValue(first: Char) {
         if(first == '"') {
             parseString()
+            skipWhitespace()
+
             val f = if(buffer.isReadable) buffer.getByte(buffer.readerIndex()) else 0
             if(f.toChar() == ':') {
                 type = Type.FieldName
