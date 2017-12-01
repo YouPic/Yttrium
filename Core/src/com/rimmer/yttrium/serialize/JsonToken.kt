@@ -32,7 +32,10 @@ class JsonToken(val buffer: ByteBuf, var useByteString: Boolean = false) {
 
     fun expect(type: Type, allowNull: Boolean = false) {
         parse()
-        if(this.type !== type || (this.type === Type.NullLit && !allowNull)) {
+
+        if(this.type !== type) {
+            if(this.type === Type.NullLit && allowNull) return
+
             // It is very common for js-produced values to contain strings that should be numbers.
             // We add a conversion here as a special case.
             if(type === Type.NumberLit && this.type === Type.StringLit) {

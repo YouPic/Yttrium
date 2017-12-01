@@ -5,7 +5,11 @@ package com.rimmer.yttrium
  * These errors are caught by the router and transformed into http responses.
  */
 
-open class RouteException(text: String, val response: Any?): Exception(text)
+open class RouteException(text: String, val response: Any?): Exception(text) {
+    override fun toString(): String {
+        return "${javaClass.simpleName}: $message"
+    }
+}
 
 /** This is mapped to 404 and should be thrown whenever something that was requested doesn't exist. */
 open class NotFoundException(response: Any? = null) : RouteException("not_found", response)
