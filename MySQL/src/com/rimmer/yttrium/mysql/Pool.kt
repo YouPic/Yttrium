@@ -37,11 +37,11 @@ class SQLPool(
     }
 }
 
-fun SQLPool.query(context: Context, query: String, vararg params: Any?, types: List<Class<*>>? = null): Task<QueryResult> {
+fun SQLPool.query(context: Context, query: String, args: List<Any?>, types: List<Class<*>>? = null): Task<QueryResult> {
     val task = Task<QueryResult>()
     this[context].get { c, e ->
         if(e == null) {
-            c!!.query(query, Arrays.asList(*params), types, context.listenerData) { r, e ->
+            c!!.query(query, args, types, context.listenerData) { r, e ->
                 c.disconnect()
                 if (e == null) {
                     task.finish(r!!)
@@ -55,3 +55,6 @@ fun SQLPool.query(context: Context, query: String, vararg params: Any?, types: L
     }
     return task
 }
+
+fun SQLPool.query(context: Context, query: String, vararg params: Any?, types: List<Class<*>>? = null) =
+    query(context, query, Arrays.asList(*params), types)
