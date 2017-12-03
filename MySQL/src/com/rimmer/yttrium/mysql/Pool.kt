@@ -41,7 +41,7 @@ fun SQLPool.query(context: Context, query: String, args: List<Any?>, types: List
     val task = Task<QueryResult>()
     this[context].get { c, e ->
         if(e == null) {
-            c!!.query(query, args, types, context.listenerData) { r, e ->
+            c!!.query(query, args, types, context.listenerData, false) { r, e ->
                 c.disconnect()
                 if (e == null) {
                     task.finish(r!!)
@@ -58,3 +58,22 @@ fun SQLPool.query(context: Context, query: String, args: List<Any?>, types: List
 
 fun SQLPool.query(context: Context, query: String, vararg params: Any?, types: List<Class<*>>? = null) =
     query(context, query, Arrays.asList(*params), types)
+
+fun SQLPool.textQuery(context: Context, query: String, types: List<Class<*>>? = null): Task<QueryResult> {
+    val task = Task<QueryResult>()
+    this[context].get { c, e ->
+        if(e == null) {
+            c!!.query(query, emptyList(), types, context.listenerData, true) { r, e ->
+                c.disconnect()
+                if (e == null) {
+                    task.finish(r!!)
+                } else {
+                    task.fail(e)
+                }
+            }
+        } else {
+            task.fail(e)
+        }
+    }
+    return task
+}
