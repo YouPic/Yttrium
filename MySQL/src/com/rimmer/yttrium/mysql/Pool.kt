@@ -4,6 +4,7 @@ import com.rimmer.mysql.pool.PoolConfiguration
 import com.rimmer.mysql.pool.SingleThreadPool
 import com.rimmer.mysql.protocol.Connection
 import com.rimmer.mysql.protocol.QueryResult
+import com.rimmer.mysql.protocol.ResultSet
 import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
 import com.rimmer.yttrium.server.ServerContext
@@ -64,6 +65,25 @@ fun SQLPool.textQuery(context: Context, query: String, types: List<Class<*>>? = 
     this[context].get { c, e ->
         if(e == null) {
             c!!.query(query, emptyList(), types, context.listenerData, true) { r, e ->
+                c.disconnect()
+                if (e == null) {
+                    task.finish(r!!)
+                } else {
+                    task.fail(e)
+                }
+            }
+        } else {
+            task.fail(e)
+        }
+    }
+    return task
+}
+
+fun SQLPool.streamingQuery(context: Context, query: String, args: List<Any?>, types: List<Class<*>>? = null, chunkSize: Int = 1000, onResult: (ResultSet) -> Unit): Task<QueryResult> {
+    val task = Task<QueryResult>()
+    this[context].get { c, e ->
+        if(e == null) {
+            c!!.query(query, args, types, context.listenerData, false, chunkSize, onResult) { r, e ->
                 c.disconnect()
                 if (e == null) {
                     task.finish(r!!)

@@ -2,6 +2,7 @@ package com.rimmer.yttrium.mysql
 
 import com.rimmer.mysql.dsl.Query
 import com.rimmer.mysql.protocol.QueryResult
+import com.rimmer.mysql.protocol.ResultSet
 import com.rimmer.mysql.protocol.Row
 import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.NotFoundException
@@ -144,6 +145,19 @@ inline fun <T> Query.then(pool: SQLPool, context: Context, crossinline f: (Query
 fun Query.task(pool: SQLPool, context: Context): Task<QueryResult> {
     val task = Task<QueryResult>()
     run(pool[context], context.listenerData) {r, e ->
+        if(e == null) {
+            task.finish(r!!)
+        } else {
+            task.fail(e)
+        }
+    }
+    return task
+}
+
+/** Executes this query as a task. */
+fun Query.streamingTask(pool: SQLPool, context: Context, chunkSize: Int = 1000, onResult: (ResultSet) -> Unit): Task<QueryResult> {
+    val task = Task<QueryResult>()
+    run(pool[context], context.listenerData, chunkSize, onResult) {r, e ->
         if(e == null) {
             task.finish(r!!)
         } else {
