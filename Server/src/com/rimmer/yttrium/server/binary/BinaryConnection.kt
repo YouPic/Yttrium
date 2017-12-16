@@ -1,5 +1,6 @@
 package com.rimmer.yttrium.server.binary
 
+import com.rimmer.metrics.Metrics
 import com.rimmer.yttrium.Context
 import com.rimmer.yttrium.Task
 import com.rimmer.yttrium.logMessage
@@ -23,20 +24,25 @@ class BinaryConnection(
     val reconnectInterval: Int = 4 * 1000,
     val maxRetries: Int = 2,
     val name: String = "server",
-    val useNative: Boolean = true
+    val useNative: Boolean = true,
+    val metrics: Metrics? = null
 ) {
-    inner class Command<T>(val context: Context, val added: Long, private val f: (BinaryClient) -> Task<T>, val task: Task<T>) {
+    private val metricName = "Connection:$name"
+
+    inner class Command<T>(val context: Context, val added: Long, private val f: (BinaryClient) -> Task<T>, val task: Task<T>, val metricCall: Any?, val metricId: Int) {
         private var retries: Int = 0
 
         operator fun invoke(client: BinaryClient) {
             f(client).handler = { r, e ->
                 if(e == null) {
+                    metrics?.endEvent(metricCall, metricId)
                     task.finish(r!!)
                 } else if(e is IOException && retries < maxRetries) {
                     logWarning("${name.capitalize()} request failed due to network, trying again...")
                     retries++
                     add(this)
                 } else {
+                    metrics?.endEvent(metricCall, metricId)
                     task.fail(e)
                 }
             }
@@ -44,8 +50,9 @@ class BinaryConnection(
     }
 
     fun <T> add(context: Context, f: (BinaryClient) -> Task<T>): Task<T> {
+        val metric = metrics?.startEvent(context.listenerData, metricName, "request")
         val task = Task<T>()
-        add(Command(context, System.currentTimeMillis(), f, task))
+        add(Command(context, System.currentTimeMillis(), f, task, context.listenerData, metric ?: 0))
         return task
     }
 
