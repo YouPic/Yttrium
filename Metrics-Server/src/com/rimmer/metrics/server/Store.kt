@@ -92,9 +92,6 @@ class TimeProfile(time: DateTime): TimeSlice(time) {
 class MetricStore {
     val inFlightTimes = ArrayList<TimeMetric>()
     val inFlightProfiles = ArrayList<TimeProfile>()
-
-    val timeMap = HashMap<Long, TimeMetric>()
-    val profileMap = HashMap<Long, TimeProfile>()
     val errorMap = HashMap<String, HashMap<String, ErrorClass>>()
 
     @Synchronized fun getStats(from: Long, to: Long): List<TimeMetricResponse> {
@@ -172,10 +169,8 @@ class MetricStore {
     }
 
     @Synchronized fun onStat(packet: StatPacket, remoteName: String, remote: String) {
-        println("Received stat packet with ${packet.sampleCount} samples.")
-
         val key = packet.time.millis / 60000
-        val timePoint = addPoint(key, 7 * 24 * 60, inFlightTimes, timeMap) {
+        val timePoint = addPoint(key, 7 * 24 * 60, inFlightTimes) {
             TimeMetric(DateTime(key * 60000))
         }
 
@@ -190,13 +185,11 @@ class MetricStore {
     }
 
     @Synchronized fun onProfile(packet: ProfilePacket, remoteName: String, remote: String) {
-        println("Received profile packet with ${packet.events.size} events.")
-
         // Remove the profile builder from any old in-flight profiles.
         removeOldProfiles(packet.time, inFlightProfiles)
 
         val key = packet.time.millis / 60000
-        val timeProfile = addPoint(key, 24 * 60, inFlightProfiles, profileMap) {
+        val timeProfile = addPoint(key, 24 * 60, inFlightProfiles) {
             TimeProfile(DateTime(key * 60000))
         }
 
@@ -219,8 +212,6 @@ class MetricStore {
     }
 
     @Synchronized fun onError(packet: ErrorPacket, remoteName: String, remote: String) {
-        println("Received error packet.")
-
         val name = remoteName(remoteName, remote)
         val category = errorMap.getOrPut(packet.category) { HashMap() }
         val errorClass = category.getOrPut(packet.cause) { ErrorClass(packet.cause, packet.trace, packet.fatal) }
@@ -234,21 +225,21 @@ class MetricStore {
     private fun remoteName(name: String, remote: String) = "$name [$remote]"
 }
 
-inline fun <T> addPoint(key: Long, maxAgeMinutes: Int, list: MutableList<T>, map: MutableMap<Long, T>, create: () -> T): T {
-    return map.getOrAdd(key) {
+inline fun <T: TimeSlice> addPoint(key: Long, maxAgeMinutes: Int, list: MutableList<T>, create: () -> T): T {
+    val index = list.binarySearch { key.compareTo(it.time.millis / 60000) }
+    return if(index < 0) {
+        val insert = -index - 1
+        val v = create()
+        list.add(insert, v)
+
         // Remove older points until we have at most one week of metrics left.
         if(list.size > maxAgeMinutes) {
             list.subList(0, list.size - maxAgeMinutes).clear()
-
-            val minCreated = DateTime.now().minusMinutes(maxAgeMinutes).millis / 60000
-            val remainingItems = map.filterKeys { it > minCreated }
-            map.clear()
-            map.putAll(remainingItems)
         }
 
-        val p = create()
-        list.add(p)
-        p
+        v
+    } else {
+        list[index]
     }
 }
 

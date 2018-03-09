@@ -12,6 +12,7 @@ fun Metrics.monitorServer(loop: EventLoopGroup) {
     val usedMem = registerStat("System.memory.used", Metrics.Accumulator.max, Metrics.Scope.local, MetricUnit.ByteUnit)
     val heapMem = registerStat("System.memory.process", Metrics.Accumulator.max, Metrics.Scope.local, MetricUnit.ByteUnit)
     val committedMem = registerStat("System.memory.process.committed", Metrics.Accumulator.max, Metrics.Scope.local, MetricUnit.ByteUnit)
+    val maxMem = registerStat("System.memory.process.max", Metrics.Accumulator.max, Metrics.Scope.local, MetricUnit.ByteUnit)
     val nonHeapMem = registerStat("System.memory.process.nonheap", Metrics.Accumulator.max, Metrics.Scope.local, MetricUnit.ByteUnit)
     val totalDisk = registerStat("System.disk.total", Metrics.Accumulator.set, Metrics.Scope.global, MetricUnit.ByteUnit)
     val usedDisk = registerStat("System.disk.used", Metrics.Accumulator.max, Metrics.Scope.local, MetricUnit.ByteUnit)
@@ -33,6 +34,7 @@ fun Metrics.monitorServer(loop: EventLoopGroup) {
         setStat(heapMem, heap.used)
         setStat(nonHeapMem, nonHeap.used)
         setStat(committedMem, heap.committed)
+        setStat(maxMem, heap.max)
         setStat(totalDisk, fileSys.totalSpace)
         setStat(usedDisk, fileSys.totalSpace - fileSys.freeSpace)
 
